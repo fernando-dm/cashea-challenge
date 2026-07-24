@@ -3,6 +3,7 @@ import type { PurchaseIdGenerator } from "../../application/gateway/purchase-id-
 import { CreatePurchaseCommandService } from "../../application/service/create-purchase-command-service";
 import { GetCreditLineByUserIdQueryService } from "../../application/service/get-credit-line-by-user-id-query-service";
 import { GetPurchaseDetailByIdQueryService } from "../../application/service/get-purchase-detail-by-id-query-service";
+import { PurchaseByIdFinder } from "../../application/service/purchase-by-id-finder";
 import { PurchaseFinancingPlanCreator } from "../../application/service/purchase-financing-plan-creator";
 import type { CreditLineRepository } from "../../domain/repository/credit-line-repository";
 import type { PurchaseRepository } from "../../domain/repository/purchase-repository";
@@ -34,6 +35,8 @@ export function createRoutes(): Router {
         new SequentialPurchaseIdGenerator();
     const purchaseFinancingPlanCreator: PurchaseFinancingPlanCreator =
         new PurchaseFinancingPlanCreator();
+    const purchaseByIdFinder: PurchaseByIdFinder =
+        new PurchaseByIdFinder(purchaseRepository);
 
     const getCreditLineByUserIdQueryService: GetCreditLineByUserIdQueryService =
         new GetCreditLineByUserIdQueryService(creditLineRepository);
@@ -49,7 +52,7 @@ export function createRoutes(): Router {
             purchaseFinancingPlanCreator
         );
     const getPurchaseDetailByIdQueryService: GetPurchaseDetailByIdQueryService =
-        new GetPurchaseDetailByIdQueryService(purchaseRepository);
+        new GetPurchaseDetailByIdQueryService(purchaseByIdFinder);
     const purchaseController: PurchaseController = new PurchaseController(
         createPurchaseCommandService,
         getPurchaseDetailByIdQueryService
