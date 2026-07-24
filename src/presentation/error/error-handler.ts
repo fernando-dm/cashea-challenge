@@ -33,6 +33,10 @@ const errorMappings: Record<ApplicationErrorCode, ErrorHttpMapping> = {
     [ApplicationErrorCode.INSUFFICIENT_CREDIT]: {
         statusCode: 400,
         message: "Insufficient credit"
+    },
+    [ApplicationErrorCode.PURCHASE_NOT_FOUND]: {
+        statusCode: 404,
+        message: "Purchase not found"
     }
 };
 

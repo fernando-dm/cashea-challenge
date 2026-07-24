@@ -149,3 +149,51 @@ describe("POST /users/:userId/purchases", () => {
         });
     });
 });
+
+describe("GET /purchases/:purchaseId", () => {
+    it("returns purchase detail with installment plan", async () => {
+        // given
+        const app: Express = createApp();
+
+        await request(app)
+            .post("/users/user-with-1000-credit/purchases")
+            .send({
+                amount: "900.00",
+                installments: 3
+            })
+            .expect(201);
+
+        // when
+        const response: Response = await request(app)
+            .get("/purchases/purchase-1")
+            .expect(200);
+
+        // then
+        expect(response.body.purchaseId).toBe("purchase-1");
+        expect(response.body.userId).toBe("user-with-1000-credit");
+        expect(response.body.amount).toEqual({
+            amount: "900.00",
+            currency: "VES"
+        });
+        expect(response.body.status).toBe("ACTIVE");
+        expect(response.body.installmentPlan).toHaveLength(3);
+        expect(response.body.installmentPlan[0].status).toBe("PAID");
+        expect(response.body.installmentPlan[1].status).toBe("PENDING");
+        expect(response.body.installmentPlan[2].status).toBe("PENDING");
+    });
+
+    it("returns 404 when purchase does not exist", async () => {
+        // given
+        const app: Express = createApp();
+
+        // when
+        const response: Response = await request(app)
+            .get("/purchases/unknown-purchase")
+            .expect(404);
+
+        // then
+        expect(response.body).toEqual({
+            error: "Purchase not found"
+        });
+    });
+});

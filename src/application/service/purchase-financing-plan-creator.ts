@@ -94,15 +94,14 @@ export class PurchaseFinancingPlanCreator {
         // Las otras dos cuotas quedan en estado PENDING: 300.00 + 300.00 = 600.00.
         // Por eso el crédito a reservar es 600.00.
         // Nuevo crédito disponible esperado: 1000.00 - 600.00 = 400.00.
-        const pendingInstallmentsAmount: Decimal = installmentPlan
-            .filter((installment: Installment): boolean =>
-                installment.status === InstallmentStatus.PENDING
-            )
-            .reduce(
-                (total: Decimal, installment: Installment): Decimal =>
-                    total.plus(installment.amount.amount),
-                new Decimal("0.00")
-            );
+        let pendingInstallmentsAmount: Decimal = new Decimal("0.00");
+
+        for (const installment of installmentPlan) {
+            if (installment.status === InstallmentStatus.PENDING) {
+                pendingInstallmentsAmount =
+                    pendingInstallmentsAmount.plus(installment.amount.amount);
+            }
+        }
 
         return {
             amount: pendingInstallmentsAmount,

@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { PurchaseIdGenerator } from "../../application/gateway/purchase-id-generator";
 import { CreatePurchaseCommandService } from "../../application/service/create-purchase-command-service";
 import { GetCreditLineByUserIdQueryService } from "../../application/service/get-credit-line-by-user-id-query-service";
+import { GetPurchaseDetailByIdQueryService } from "../../application/service/get-purchase-detail-by-id-query-service";
 import { PurchaseFinancingPlanCreator } from "../../application/service/purchase-financing-plan-creator";
 import type { CreditLineRepository } from "../../domain/repository/credit-line-repository";
 import type { PurchaseRepository } from "../../domain/repository/purchase-repository";
@@ -16,6 +17,8 @@ import type {
 import {
     CreatePurchaseRequestHttp,
     CreatePurchaseResponseHttp,
+    GetPurchaseDetailRequestHttp,
+    GetPurchaseDetailResponseHttp,
     PurchaseController
 } from "./purchase-controller";
 
@@ -45,8 +48,11 @@ export function createRoutes(): Router {
             purchaseIdGenerator,
             purchaseFinancingPlanCreator
         );
+    const getPurchaseDetailByIdQueryService: GetPurchaseDetailByIdQueryService =
+        new GetPurchaseDetailByIdQueryService(purchaseRepository);
     const purchaseController: PurchaseController = new PurchaseController(
-        createPurchaseCommandService
+        createPurchaseCommandService,
+        getPurchaseDetailByIdQueryService
     );
 
     router.get(
@@ -59,6 +65,12 @@ export function createRoutes(): Router {
         "/users/:userId/purchases",
         (req: CreatePurchaseRequestHttp, res: CreatePurchaseResponseHttp) =>
             purchaseController.createPurchase(req, res)
+    );
+
+    router.get(
+        "/purchases/:purchaseId",
+        (req: GetPurchaseDetailRequestHttp, res: GetPurchaseDetailResponseHttp) =>
+            purchaseController.getPurchaseDetailById(req, res)
     );
 
     return router;

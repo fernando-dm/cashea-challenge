@@ -98,13 +98,42 @@ El endpoint `POST /users/:userId/purchases` se implementa como command porque mo
 
 El request de aplicación vive en `application/dto/request/create-purchase-request.ts` y unifica el `userId` del path con el body HTTP (`amount`, `installments`).
 
-Para este alcance, el request no recibe `currency`. Los montos se interpretan en la moneda local de la línea de crédito. Esta decisión evita conversiones implícitas de moneda, que en un sistema financiero requieren reglas explícitas de tipo de cambio, redondeo, auditoría y regulación.
+Para este alcance, el request no recibe `currency`, los montos se interpretan en la moneda local de la línea de crédito, esta decisión evita conversiones implícitas de moneda, que en un sistema financiero requieren reglas explícitas de tipo de cambio, redondeo, auditoría y regulación.
 
-El primer slice del endpoint cierra el contrato HTTP y devuelve una respuesta mínima. Las reglas financieras se incorporarán paso a paso: cuotas permitidas, crédito suficiente, generación de plan de cuotas y actualización de crédito disponible.
+La creación de compra valida cuotas permitidas, monto positivo y crédito suficiente. \
+Si la línea de crédito existe y el crédito disponible alcanza, se crea una compra con su plan financiero: la primera cuota queda pagada al momento de la compra y las restantes quedan pendientes.
+
+El crédito disponible no se reduce por el monto total de la compra, sino por el monto de las cuotas pendientes, esto respeta la regla del producto: la primera cuota se paga al momento y el usuario recupera crédito a medida que paga cuotas.
+
+Ejemplo:
+
+```txt
+Crédito disponible inicial: 1000.00
+Compra: 900.00 en 3 cuotas
+Cuota 1: 300.00 PAID al momento
+Cuotas pendientes: 300.00 + 300.00 = 600.00
+Nuevo crédito disponible: 1000.00 - 600.00 = 400.00
+```
+
+En 1er instancia etapa se realizo con una persistencia in-memory para validar reglas de negocio y flujo HTTP.  
+Los repositories se mantienen como abstracciones para reemplazar luego por PostgreSQL sin modificar controllers ni casos de uso.
+
+## Consultar detalle de compra
+### Parte 1 Consultar el detalle de una compra con su plan de cuotas.
+
+La consulta `GET /purchases/:purchaseId` se implementa como query dentro de la capa de aplicación, por lo tanto no modifica estado.
+
+El caso de uso depende de `PurchaseRepository`, esto permite consultar compras guardadas hoy en memoria y luego reemplazar esa implementación por PostgreSQL sin modificar el controller ni la lógica de aplicación.
+
+La respuesta expone el detalle de la compra y su plan de cuotas: monto total, estado de la compra, fechas de creación/modificación y cuotas con número, monto, vencimiento, estado y fecha de pago cuando aplica.
+
+Una cuota pagada tiene estado `PAID` y `paidAt` informado. Una cuota pendiente tiene estado `PENDING` y `paidAt: null`, porque todavía no existe una fecha de pago.
+
+Si no existe una compra asociada al `purchaseId`, la API responde `404 Not Found` con `Purchase not found`, el `null` que puede devolver el repository se transforma inmediatamente en un error de aplicación, evitando que valores ausentes se filtren al resto del flujo.
 
 ## Supuestos iniciales
 
-- Los montos se representan como enteros en unidades menores de la moneda, por ejemplo centavos.
+- Los montos se reciben como texto decimal con hasta dos decimales y se modelan internamente con `Decimal` para evitar errores de precisión de JavaScript.
 - Modele un tipo de objeto especifico para la moneda porque permite trabajar de forma mas dinamica, ejemplo que pasa con moneda de otro pais?
 - Las cuotas permitidas son 3, 6 o 12.
 - Una compra consume crédito disponible al momento de confirmarse.
@@ -113,3 +142,7 @@ El primer slice del endpoint cierra el contrato HTTP y devuelve una respuesta m�
 - Pagar una cuota pendiente restaura crédito disponible por el monto de esa cuota.
 - Las operaciones que modifican dinero o crédito deben ejecutarse dentro de una transacción.
 - La API debe rechazar valores inválidos antes de ejecutar reglas de negocio.
+
+---
+__La validación manual del flujo se documenta en [README.md](./README.md#pruebas-manuales-con-curl) mediante comandos `curl` y respuestas esperadas. \
+Este documento se mantiene enfocado en las decisiones de modelado, arquitectura y reglas de negocio.__
