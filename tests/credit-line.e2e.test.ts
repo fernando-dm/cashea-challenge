@@ -18,11 +18,11 @@ describe("GET /users/:userId/credit-line", () => {
         expect(response.body).toEqual({
             userId: "user-1",
             creditLimit: {
-                amount: 100000,
+                amount: "100000.00",
                 currency: "VES"
             },
             availableCredit: {
-                amount: 100000,
+                amount: "100000.00",
                 currency: "VES"
             }
         });
@@ -41,11 +41,11 @@ describe("GET /users/:userId/credit-line", () => {
         expect(response.body).toEqual({
             userId: "user-without-credit",
             creditLimit: {
-                amount: 100000,
+                amount: "100000.00",
                 currency: "VES"
             },
             availableCredit: {
-                amount: 0,
+                amount: "0.00",
                 currency: "VES"
             }
         });

@@ -21,6 +21,18 @@ const errorMappings: Record<ApplicationErrorCode, ErrorHttpMapping> = {
     [ApplicationErrorCode.CREDIT_LINE_NOT_FOUND]: {
         statusCode: 404,
         message: "Credit line not found"
+    },
+    [ApplicationErrorCode.INVALID_INSTALLMENT_PLAN]: {
+        statusCode: 400,
+        message: "Invalid installment plan"
+    },
+    [ApplicationErrorCode.INVALID_PURCHASE_AMOUNT]: {
+        statusCode: 400,
+        message: "Invalid purchase amount"
+    },
+    [ApplicationErrorCode.INSUFFICIENT_CREDIT]: {
+        statusCode: 400,
+        message: "Insufficient credit"
     }
 };
 

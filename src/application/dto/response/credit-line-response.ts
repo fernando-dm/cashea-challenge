@@ -1,7 +1,7 @@
-import type { Currency } from "../../domain/model/money";
+import { Currency } from "../../../domain/model/money";
 
 export type MoneyResponse = {
-    amount: number;
+    amount: string;
     currency: Currency;
 };
 

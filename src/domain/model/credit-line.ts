@@ -4,4 +4,5 @@ export type CreditLine = {
     userId: string;
     creditLimit: Money;
     availableCredit: Money;
+    updatedAt: Date;
 };

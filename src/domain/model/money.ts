@@ -1,8 +1,10 @@
+import type Decimal from "decimal.js";
+
 export enum Currency {
     VES = "VES"
 }
 
 export type Money = {
-    amount: number;
+    amount: Decimal;
     currency: Currency;
 };

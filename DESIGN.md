@@ -28,6 +28,11 @@ Los controllers declaran explícitamente el contrato HTTP de cada endpoint: path
 Las carpetas se nombran **por intención estable** y no por mecanismo accidental del framework. \
 Por ejemplo, el manejo de errores HTTP vive en `presentation/error` y no en `presentation/middleware`, porque su responsabilidad principal es traducir errores de aplicación a respuestas HTTP.
 
+Los contratos de entrada y salida de la capa de aplicación se separan por intención: dentro de `application/dto/request` y `application/dto/response`. \
+No se usa `dto` como cajón genérico: 
+ - si una estructura representa entrada de caso de uso va en `request`; 
+ - si representa salida hacia presentation va en `response`.
+
 ## Capas
 
 ### Domain
@@ -85,6 +90,17 @@ Si no existe una línea de crédito aprobada asociada al `userId`, la API respon
 Tambien esta el caso de que haya un error en la obtencion de la linea de credito (porque no?)
 
 La falta de crédito suficiente se validará al crear una compra, no al consultar la línea de crédito.
+
+## Crear compra en cuotas
+### Parte 1 Crear una compra en cuotas (`amount`, `installments`).
+
+El endpoint `POST /users/:userId/purchases` se implementa como command porque modifica estado.
+
+El request de aplicación vive en `application/dto/request/create-purchase-request.ts` y unifica el `userId` del path con el body HTTP (`amount`, `installments`).
+
+Para este alcance, el request no recibe `currency`. Los montos se interpretan en la moneda local de la línea de crédito. Esta decisión evita conversiones implícitas de moneda, que en un sistema financiero requieren reglas explícitas de tipo de cambio, redondeo, auditoría y regulación.
+
+El primer slice del endpoint cierra el contrato HTTP y devuelve una respuesta mínima. Las reglas financieras se incorporarán paso a paso: cuotas permitidas, crédito suficiente, generación de plan de cuotas y actualización de crédito disponible.
 
 ## Supuestos iniciales
 

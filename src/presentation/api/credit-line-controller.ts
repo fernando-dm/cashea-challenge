@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import type { CreditLineResponse } from "../../application/response/credit-line-response";
+import type { CreditLineResponse } from "../../application/dto/response/credit-line-response";
 import { GetCreditLineByUserIdQueryService } from "../../application/service/get-credit-line-by-user-id-query-service";
 
 export type GetCreditLineParams = {

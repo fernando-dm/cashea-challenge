@@ -1,4 +1,4 @@
-import type { CreditLineResponse } from "../response/credit-line-response";
+import type { CreditLineResponse } from "../dto/response/credit-line-response";
 import { CreditLineNotFoundError } from "../exception/credit-line-not-found-error";
 import { InvalidUserIdError } from "../exception/invalid-user-id-error";
 import type { CreditLine } from "../../domain/model/credit-line";
@@ -36,11 +36,11 @@ export class GetCreditLineByUserIdQueryService {
         return {
             userId: creditLine.userId,
             creditLimit: {
-                amount: creditLine.creditLimit.amount,
+                amount: creditLine.creditLimit.amount.toFixed(2),
                 currency: creditLine.creditLimit.currency
             },
             availableCredit: {
-                amount: creditLine.availableCredit.amount,
+                amount: creditLine.availableCredit.amount.toFixed(2),
                 currency: creditLine.availableCredit.currency
             }
         };
