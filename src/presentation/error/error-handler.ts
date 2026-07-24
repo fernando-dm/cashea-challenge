@@ -37,6 +37,14 @@ const errorMappings: Record<ApplicationErrorCode, ErrorHttpMapping> = {
     [ApplicationErrorCode.PURCHASE_NOT_FOUND]: {
         statusCode: 404,
         message: "Purchase not found"
+    },
+    [ApplicationErrorCode.INSTALLMENT_NOT_FOUND]: {
+        statusCode: 404,
+        message: "Installment not found"
+    },
+    [ApplicationErrorCode.INSTALLMENT_ALREADY_PAID]: {
+        statusCode: 409,
+        message: "Installment already paid"
     }
 };
 

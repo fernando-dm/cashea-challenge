@@ -2,7 +2,8 @@ import type { Installment } from "./installment";
 import type { Money } from "./money";
 
 export enum PurchaseStatus {
-    ACTIVE = "ACTIVE"
+    ACTIVE = "ACTIVE",
+    COMPLETED = "COMPLETED"
 }
 
 export type Purchase = {
