@@ -1,0 +1,48 @@
+import type { CreditLineResponse } from "../response/credit-line-response";
+import { CreditLineNotFoundError } from "../exception/credit-line-not-found-error";
+import { InvalidUserIdError } from "../exception/invalid-user-id-error";
+import type { CreditLine } from "../../domain/model/credit-line";
+import type { CreditLineRepository } from "../../domain/repository/credit-line-repository";
+
+export class GetCreditLineByUserIdQueryService {
+    constructor(private readonly creditLineRepository: CreditLineRepository) {}
+
+    execute(userId: string): CreditLineResponse {
+        this.validate(userId);
+
+        const creditLine: CreditLine = this.findCreditLineByUserId(userId);
+
+        return this.toResponse(creditLine);
+    }
+
+    private validate(userId: string): void {
+        if (userId.trim().length === 0) {
+            throw new InvalidUserIdError();
+        }
+    }
+
+    private findCreditLineByUserId(userId: string): CreditLine {
+        const creditLine: CreditLine | null =
+            this.creditLineRepository.findCreditLineByUserId(userId);
+
+        if (creditLine === null) {
+            throw new CreditLineNotFoundError(userId);
+        }
+
+        return creditLine;
+    }
+
+    private toResponse(creditLine: CreditLine): CreditLineResponse {
+        return {
+            userId: creditLine.userId,
+            creditLimit: {
+                amount: creditLine.creditLimit.amount,
+                currency: creditLine.creditLimit.currency
+            },
+            availableCredit: {
+                amount: creditLine.availableCredit.amount,
+                currency: creditLine.availableCredit.currency
+            }
+        };
+    }
+}

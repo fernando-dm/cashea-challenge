@@ -15,7 +15,7 @@ aprobada, compras en cuotas y recuperación de crédito disponible al pagar cuot
 
 ## Requisitos
 
-- Node.js 20
+- Node.js 22
 - npm
 - PostgreSQL
 
