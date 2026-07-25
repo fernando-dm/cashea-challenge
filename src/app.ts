@@ -16,6 +16,11 @@ export function createApp(): Express {
 
     app.use(express.json());
 
+    // Servimos el frontend mínimo como archivos estáticos separados del backend.
+    // Esto permite probar el flujo end-to-end desde el mismo puerto sin agregar CORS,
+    // bundlers ni dependencias de frontend que no aportan al challenge.
+    app.use(express.static("frontend"));
+
     // Routes no instancia servicios ni repositorios: solo recibe controllers listos para usar.
     // Esto mantiene separada la configuración de dependencias del registro de endpoints.
     app.use(createRoutes(dependencyContainer));

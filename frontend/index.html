@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cashea Challenge</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <main class="page">
+        <section class="hero">
+            <p class="eyebrow">Frontend web mínimo</p>
+            <h1>Cashea Challenge</h1>
+            <p>
+                Flujo end-to-end para consultar crédito, simular una compra y confirmarla
+                contra la API del backend.
+            </p>
+        </section>
+
+        <section class="card">
+            <h2>Línea de crédito</h2>
+            <label for="user-id">Usuario</label>
+            <div class="row">
+                <input id="user-id" type="text" autocomplete="off">
+                <button id="load-credit-line" type="button">Consultar línea</button>
+            </div>
+            <div id="credit-line" class="summary">
+                <p>Consultá una línea de crédito para empezar.</p>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>Simular compra</h2>
+            <div class="form-grid">
+                <label>
+                    Monto
+                    <input id="amount" type="number" min="0" step="0.01" placeholder="300.00">
+                </label>
+
+                <label>
+                    Cuotas
+                    <select id="installments">
+                        <option value="3">3 cuotas</option>
+                        <option value="6">6 cuotas</option>
+                        <option value="12">12 cuotas</option>
+                    </select>
+                </label>
+            </div>
+
+            <div class="actions">
+                <button id="preview-purchase" type="button">Simular plan</button>
+                <button id="confirm-purchase" type="button" disabled>Confirmar compra</button>
+            </div>
+
+            <div id="preview" class="summary">
+                <p>Simulá una compra para ver el plan de cuotas.</p>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>Resultado</h2>
+            <div id="result" aria-live="polite">
+                <p>Sin operaciones todavía.</p>
+            </div>
+        </section>
+    </main>
+
+    <script src="/app.js"></script>
+</body>
+</html>
