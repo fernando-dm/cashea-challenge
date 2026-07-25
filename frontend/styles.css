@@ -154,24 +154,30 @@ dd {
     font-weight: 700;
 }
 
-.installments {
+.installments,
+.purchases-list {
     display: grid;
     gap: 10px;
     padding-left: 22px;
 }
 
-.installments li {
+.installments li,
+.purchases-list li {
     padding: 10px 0;
 }
 
 .installments span,
 .installments strong,
-.installments small {
+.installments small,
+.purchases-list span,
+.purchases-list strong,
+.purchases-list small {
     display: inline-block;
     margin-right: 8px;
 }
 
-.installments small {
+.installments small,
+.purchases-list small {
     color: #56616f;
 }
 

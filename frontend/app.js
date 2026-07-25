@@ -2,6 +2,7 @@ const state = {
     userId: "user-with-1000-credit",
     creditLine: null,
     preview: null,
+    purchases: [],
     lastPurchase: null,
     lastPurchaseDetail: null,
     loading: false
@@ -14,8 +15,8 @@ const amountInput = document.querySelector("#amount");
 const installmentsSelect = document.querySelector("#installments");
 const previewButton = document.querySelector("#preview-purchase");
 const confirmButton = document.querySelector("#confirm-purchase");
-const purchaseIdInput = document.querySelector("#purchase-id");
-const loadPurchaseButton = document.querySelector("#load-purchase");
+const loadPurchasesButton = document.querySelector("#load-purchases");
+const purchasesSection = document.querySelector("#purchases");
 const previewSection = document.querySelector("#preview");
 const resultSection = document.querySelector("#result");
 const purchaseDetailSection = document.querySelector("#purchase-detail");
@@ -25,10 +26,19 @@ userIdInput.value = state.userId;
 loadCreditLineButton.addEventListener("click", loadCreditLine);
 previewButton.addEventListener("click", previewPurchase);
 confirmButton.addEventListener("click", confirmPurchase);
-loadPurchaseButton.addEventListener("click", loadPurchaseDetail);
+loadPurchasesButton.addEventListener("click", loadPurchases);
 userIdInput.addEventListener("input", clearUserStateAndMessage);
 amountInput.addEventListener("input", clearPreview);
 installmentsSelect.addEventListener("change", clearPreview);
+purchasesSection.addEventListener("click", (event) => {
+    const detailButton = event.target.closest("[data-purchase-id]");
+
+    if (detailButton === null) {
+        return;
+    }
+
+    loadPurchaseDetail(detailButton.dataset.purchaseId);
+});
 
 loadCreditLine();
 
@@ -44,11 +54,13 @@ async function loadCreditLine() {
         async () => {
             state.creditLine = await getCreditLine(state.userId);
             state.preview = null;
+            state.purchases = [];
             state.lastPurchase = null;
             state.lastPurchaseDetail = null;
 
             renderCreditLine();
             renderPreview();
+            renderPurchases();
             renderPurchaseDetail();
             showSuccess("Línea de crédito actualizada.");
         },
@@ -112,13 +124,14 @@ async function confirmPurchase() {
         state.lastPurchaseDetail = await getPurchaseDetail(
             state.lastPurchase.purchaseId
         );
-        purchaseIdInput.value = state.lastPurchase.purchaseId;
+        state.purchases = await getPurchases(state.userId);
         state.creditLine = await getCreditLine(state.userId);
         state.preview = null;
         amountInput.value = "";
 
         renderCreditLine();
         renderPreview();
+        renderPurchases();
         renderPurchaseDetail();
         showSuccess(
             `Compra confirmada: ${state.lastPurchase.purchaseId}. ` +
@@ -134,8 +147,10 @@ async function payPendingInstallment(purchaseId, installmentNumber) {
         const paymentResult = await payInstallment(purchaseId, installmentNumber);
         state.lastPurchaseDetail = await getPurchaseDetail(purchaseId);
         state.creditLine = await getCreditLine(state.lastPurchaseDetail.userId);
+        state.purchases = await getPurchases(state.lastPurchaseDetail.userId);
 
         renderCreditLine();
+        renderPurchases();
         renderPurchaseDetail();
         showSuccess(
             `Cuota ${paymentResult.installmentNumber} pagada. ` +
@@ -145,16 +160,28 @@ async function payPendingInstallment(purchaseId, installmentNumber) {
     });
 }
 
-async function loadPurchaseDetail() {
-    const purchaseId = purchaseIdInput.value.trim();
+async function loadPurchases() {
+    state.userId = userIdInput.value.trim();
 
-    if (purchaseId.length === 0) {
-        showError("Ingresá un purchase id para consultar la compra.");
+    if (state.userId.length === 0) {
+        showError("Ingresá un user id para consultar sus compras.");
         return;
     }
 
     await runWithLoading(async () => {
-        // Consultar compra permite pagar cuotas existentes, no solo la última compra creada.
+        // El listado permite elegir una compra existente sin conocer su id de antemano.
+        state.purchases = await getPurchases(state.userId);
+        state.creditLine = await getCreditLine(state.userId);
+
+        renderCreditLine();
+        renderPurchases();
+        showSuccess("Compras cargadas. Elegí una para ver su detalle.");
+    });
+}
+
+async function loadPurchaseDetail(purchaseId) {
+    await runWithLoading(async () => {
+        // El detalle sigue usando su endpoint específico para mantener responsabilidades separadas.
         state.lastPurchaseDetail = await getPurchaseDetail(purchaseId);
         state.userId = state.lastPurchaseDetail.userId;
         userIdInput.value = state.userId;
@@ -170,6 +197,10 @@ async function loadPurchaseDetail() {
 
 async function getCreditLine(userId) {
     return getJson(`/users/${encodeURIComponent(userId)}/credit-line`);
+}
+
+async function getPurchases(userId) {
+    return getJson(`/users/${encodeURIComponent(userId)}/purchases`);
 }
 
 async function previewPurchasePlan(userId, amount, installments) {
@@ -319,6 +350,9 @@ function renderPreview() {
                 <dd>${formatMoneyText(state.preview.creditToReserve)}</dd>
             </div>
         </dl>
+            <p class="help-text">
+              La primera cuota se paga al momento; solo las cuotas financiadas consumen crédito disponible.
+            </p>
         <h3>Plan de cuotas</h3>
         <ol class="installments">
             ${state.preview.installmentPlan.map(renderPreviewInstallment).join("")}
@@ -328,6 +362,40 @@ function renderPreview() {
 
     confirmButton.disabled = !state.preview.canBeConfirmed;
 }
+
+function renderPurchases() {
+    if (state.purchases.length === 0) {
+        purchasesSection.classList.add("hidden");
+        purchasesSection.innerHTML = "";
+        return;
+    }
+
+    purchasesSection.classList.remove("hidden");
+    purchasesSection.innerHTML = `
+        <ol class="purchases-list">
+            ${state.purchases.map(renderPurchaseSummary).join("")}
+        </ol>
+    `;
+}
+
+function renderPurchaseSummary(purchase) {
+    return `
+        <li>
+            <span>${escapeHtml(purchase.purchaseId)}</span>
+            <strong>${formatMoneyText(purchase.amount)}</strong>
+            <small>${escapeHtml(purchase.status)}</small>
+            <small>${escapeHtml(purchase.pendingInstallments)} pendientes</small>
+            <button
+                class="small-button"
+                type="button"
+                data-purchase-id="${escapeHtml(purchase.purchaseId)}"
+            >
+                Ver detalle
+            </button>
+        </li>
+    `;
+}
+
 
 function renderPurchaseDetail() {
     if (state.lastPurchaseDetail === null) {
@@ -387,11 +455,13 @@ function clearPreview() {
 function clearUserState() {
     state.creditLine = null;
     state.preview = null;
+    state.purchases = [];
     state.lastPurchase = null;
     state.lastPurchaseDetail = null;
 
     renderCreditLine();
     renderPreview();
+    renderPurchases();
     renderPurchaseDetail();
 }
 
@@ -407,7 +477,12 @@ function setLoading(isLoading) {
     previewButton.disabled = isLoading;
     confirmButton.disabled = isLoading || state.preview === null ||
         !state.preview.canBeConfirmed;
-    loadPurchaseButton.disabled = isLoading;
+    loadPurchasesButton.disabled = isLoading;
+    purchasesSection
+        .querySelectorAll("[data-purchase-id]")
+        .forEach((detailButton) => {
+            detailButton.disabled = isLoading;
+        });
     purchaseDetailSection
         .querySelectorAll("[data-installment-number]")
         .forEach((payButton) => {

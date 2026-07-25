@@ -20,6 +20,10 @@ class FakePurchaseRepository implements PurchaseRepository {
     async findPurchaseById(_purchaseId: string): Promise<Purchase | null> {
         return this.purchase;
     }
+
+    async findPurchasesByUserId(_userId: string): Promise<Purchase[]> {
+        return this.purchase === null ? [] : [this.purchase];
+    }
 }
 
 function createPurchase(): Purchase {

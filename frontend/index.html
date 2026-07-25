@@ -58,15 +58,12 @@
         </section>
 
         <section class="card">
-            <h2>Consultar compra</h2>
-            <label for="purchase-id">Compra</label>
-            <div class="row">
-                <input id="purchase-id" type="text" autocomplete="off" placeholder="purchase-1">
-                <button id="load-purchase" type="button">Ver compra</button>
-            </div>
+            <h2>Compras del usuario</h2>
+            <button id="load-purchases" type="button">Ver compras</button>
             <p class="help-text">
-                Usá este punto para cargar una compra existente y pagar sus cuotas pendientes.
+                Cargá las compras del usuario actual, elegí una y pagá sus cuotas pendientes.
             </p>
+            <div id="purchases" class="summary hidden"></div>
         </section>
 
         <section class="card">

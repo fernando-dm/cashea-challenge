@@ -19,4 +19,13 @@ export class InMemoryPurchaseRepository implements PurchaseRepository {
 
         return purchase ?? null;
     }
+
+    async findPurchasesByUserId(userId: string): Promise<Purchase[]> {
+        return Array.from(this.purchasesById.values())
+            .filter((purchase: Purchase): boolean => purchase.userId === userId)
+            .sort(
+                (leftPurchase: Purchase, rightPurchase: Purchase): number =>
+                    rightPurchase.createdAt.getTime() - leftPurchase.createdAt.getTime()
+            );
+    }
 }

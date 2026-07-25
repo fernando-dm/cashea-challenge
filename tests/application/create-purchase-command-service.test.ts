@@ -54,6 +54,10 @@ class FakePurchaseRepository implements PurchaseRepository {
     async findPurchaseById(_purchaseId: string): Promise<Purchase | null> {
         return this.savedPurchase;
     }
+
+    async findPurchasesByUserId(_userId: string): Promise<Purchase[]> {
+        return this.savedPurchase === null ? [] : [this.savedPurchase];
+    }
 }
 
 class FakeTransactionManager implements TransactionManager {

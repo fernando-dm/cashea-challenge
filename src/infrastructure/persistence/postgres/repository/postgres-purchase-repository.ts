@@ -82,6 +82,48 @@ export class PostgresPurchaseRepository implements PurchaseRepository {
         );
     }
 
+    async findPurchasesByUserId(userId: string): Promise<Purchase[]> {
+        const purchaseResult = await this.postgresClient.query<PurchaseRow>(
+            `SELECT
+                purchase_id,
+                user_id,
+                amount,
+                currency,
+                installments,
+                status,
+                created_at,
+                updated_at
+            FROM purchases
+            WHERE user_id = $1
+            ORDER BY created_at DESC`,
+            [userId]
+        );
+
+        const purchases: Purchase[] = [];
+
+        for (const purchaseRow of purchaseResult.rows) {
+            const installmentsResult =
+                await this.postgresClient.query<InstallmentRow>(
+                    `SELECT
+                        purchase_id,
+                        installment_number,
+                        amount,
+                        currency,
+                        status,
+                        due_date,
+                        paid_at
+                    FROM installments
+                    WHERE purchase_id = $1
+                    ORDER BY installment_number`,
+                    [purchaseRow.purchase_id]
+                );
+
+            purchases.push(this.toPurchase(purchaseRow, installmentsResult.rows));
+        }
+
+        return purchases;
+    }
+
     private async savePurchase(purchase: Purchase): Promise<void> {
         // Usamos upsert para que guardar la misma compra dos veces sea idempotente:
         // si la compra existe, actualizamos su estado; si no existe, la insertamos.

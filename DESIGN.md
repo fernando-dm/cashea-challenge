@@ -280,3 +280,48 @@ Ventajas del uso de CQRS (querys vs commands):
 ---
 __La validación manual del flujo se documenta en [README.md](./README.md#pruebas-manuales-con-curl) mediante comandos `curl` y respuestas esperadas. \
 Este documento se mantiene enfocado en las decisiones de modelado, arquitectura y reglas de negocio.__
+
+## Frontend web mínimo
+
+El frontend se implementó como HTML, CSS y `fetch`, servido estáticamente desde Express. \
+La decisión busca mantener el entregable simple: el foco de la prueba está en backend, reglas de dinero, persistencia y seguridad, por lo que no agregué React, Vite ni un build frontend separado.
+
+La UI vive en `frontend/` para no mezclar código de presentación web con la arquitectura backend (`domain`, `application`, `infrastructure`, `presentation/api`). \
+Express solo sirve esos archivos como estáticos; las reglas de negocio siguen estando en los casos de uso del backend.
+
+Decisiones principales:
+
+- La simulación de compra llama a `POST /users/:userId/purchases/preview`.
+- El navegador no recalcula reglas de cuotas ni crédito disponible.
+- Después de confirmar una compra, la UI consulta `GET /purchases/:purchaseId` para mostrar el estado real persistido.
+- Después de pagar una cuota, la UI vuelve a consultar detalle de compra, línea de crédito y listado de compras.
+- El listado de compras por usuario permite pagar cuotas existentes sin exigir que el usuario conozca un `purchaseId` de antemano.
+
+### Endpoint agregado por simplicidad del frontend
+
+Además de los endpoints mínimos del enunciado, agregué:
+
+```http
+GET /users/:userId/purchases
+```
+
+Este endpoint devuelve summaries de compras del usuario. \
+Se agregó por motivos de simpleza y usabilidad del frontend mínimo: permite mostrar compras disponibles y elegir una para ver detalle o pagar cuotas pendientes. \
+El detalle completo sigue estando en `GET /purchases/:purchaseId` y el pago sigue estando en `POST /purchases/:purchaseId/installments/:installmentNumber/pay`, manteniendo responsabilidades separadas.
+
+En una versión con autenticación real, este endpoint debería validar que el usuario autenticado coincida con el `userId` del path. \
+Los endpoints por `purchaseId` deberían validar que `purchase.userId` coincida con el usuario autenticado para evitar IDOR. No alcanza con agregar `userId` al path; la autorización debe depender del sujeto autenticado.
+
+### Supuesto de crédito usado por frontend y backend
+
+La primera cuota se paga al momento de crear la compra. \
+Por eso, el sistema compara el crédito disponible contra el monto financiado pendiente (`creditToReserve`), no contra el monto total de la compra.
+
+Ejemplo: una compra de `600.00 VES` en 3 cuotas genera:
+
+- cuota 1: `200.00 VES`, pagada al momento;
+- cuota 2: `200.00 VES`, financiada;
+- cuota 3: `200.00 VES`, financiada.
+
+En ese caso, el crédito a reservar es `400.00 VES`. \
+Si el usuario tiene `400.00 VES` disponibles, la compra puede confirmarse porque solo las cuotas financiadas consumen crédito disponible.

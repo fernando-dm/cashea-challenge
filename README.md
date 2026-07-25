@@ -974,3 +974,35 @@ Estado esperado:
 purchase-1 queda COMPLETED con sus 3 cuotas PAID.
 purchase-2 queda ACTIVE con cuota 1 PAID y cuotas 2/3 PENDING.
 ```
+
+## Frontend web mínimo
+
+La aplicación también sirve una interfaz web mínima desde Express:
+
+```txt
+http://localhost:3000/
+```
+
+El código del frontend vive en `frontend/` y usa HTML, CSS y `fetch`, sin framework ni build separado.
+
+Flujo disponible desde la pantalla:
+
+1. Consultar la línea de crédito del usuario.
+2. Simular una compra contra el backend.
+3. Confirmar la compra.
+4. Ver compras del usuario.
+5. Ver detalle de una compra.
+6. Pagar cuotas pendientes.
+7. Ver el crédito disponible actualizado.
+
+Endpoints usados por el frontend:
+
+- `GET /users/:userId/credit-line`: consulta límite y disponible.
+- `POST /users/:userId/purchases/preview`: simula el plan de cuotas antes de confirmar.
+- `POST /users/:userId/purchases`: confirma la compra.
+- `GET /users/:userId/purchases`: lista compras del usuario para elegir cuál pagar.
+- `GET /purchases/:purchaseId`: obtiene el detalle persistido de una compra.
+- `POST /purchases/:purchaseId/installments/:installmentNumber/pay`: paga una cuota pendiente.
+
+La simulación no calcula reglas de cuotas en el navegador. \
+El frontend pide el preview al backend y, después de confirmar una compra o pagar una cuota, vuelve a consultar la API para mostrar estado persistido real.
