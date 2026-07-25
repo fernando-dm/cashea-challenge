@@ -10,6 +10,9 @@ import type { PurchaseRepository } from "../domain/repository/purchase-repositor
 import { SequentialPurchaseIdGenerator } from "../infrastructure/gateway/sequential-purchase-id-generator";
 import { InMemoryCreditLineRepository } from "../infrastructure/persistence/in-memory/in-memory-credit-line-repository";
 import { InMemoryPurchaseRepository } from "../infrastructure/persistence/in-memory/in-memory-purchase-repository";
+import { postgresPool } from "../infrastructure/persistence/postgres/pool";
+import { PostgresCreditLineRepository } from "../infrastructure/persistence/postgres/postgres-credit-line-repository";
+import { PostgresPurchaseRepository } from "../infrastructure/persistence/postgres/postgres-purchase-repository";
 import { CreditLineController } from "../presentation/api/credit-line-controller";
 import { InstallmentController } from "../presentation/api/installment-controller";
 import { PurchaseController } from "../presentation/api/purchase-controller";
@@ -79,5 +82,12 @@ function createRepositories(): Repositories {
         };
     }
 
-    throw new Error("Postgres persistence is not implemented yet");
+    if (persistenceType === PersistenceType.POSTGRES) {
+        return {
+            creditLineRepository: new PostgresCreditLineRepository(postgresPool),
+            purchaseRepository: new PostgresPurchaseRepository(postgresPool)
+        };
+    }
+
+    throw new Error(`Unsupported persistence type: ${persistenceType}`);
 }
