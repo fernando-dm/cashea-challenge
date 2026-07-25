@@ -1,13 +1,13 @@
 import Decimal from "decimal.js";
 import type { QueryResultRow } from "pg";
-import type { Installment } from "../../../domain/model/installment";
-import { InstallmentStatus } from "../../../domain/model/installment";
-import type { Money } from "../../../domain/model/money";
-import { Currency } from "../../../domain/model/money";
-import type { Purchase } from "../../../domain/model/purchase";
-import { PurchaseStatus } from "../../../domain/model/purchase";
-import type { PurchaseRepository } from "../../../domain/repository/purchase-repository";
-import type { PostgresClient } from "./postgres-client";
+import type { Installment } from "../../../../domain/model/installment";
+import { InstallmentStatus } from "../../../../domain/model/installment";
+import type { Money } from "../../../../domain/model/money";
+import { Currency } from "../../../../domain/model/money";
+import type { Purchase } from "../../../../domain/model/purchase";
+import { PurchaseStatus } from "../../../../domain/model/purchase";
+import type { PurchaseRepository } from "../../../../domain/repository/purchase-repository";
+import type { PostgresClient } from "../connection/postgres-client";
 
 type PurchaseRow = QueryResultRow & {
     purchase_id: string;

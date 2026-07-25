@@ -8,6 +8,10 @@ import { InvalidInstallmentPlanError } from "../../src/application/exception/inv
 import { InvalidPurchaseAmountError } from "../../src/application/exception/invalid-purchase-amount-error";
 import { CreatePurchaseCommandService } from "../../src/application/service/create-purchase-command-service";
 import type { PurchaseIdGenerator } from "../../src/application/gateway/purchase-id-generator";
+import type {
+    TransactionalRepositories,
+    TransactionManager
+} from "../../src/application/transaction/transaction-manager";
 import type { CreditLine } from "../../src/domain/model/credit-line";
 import { InstallmentStatus } from "../../src/domain/model/installment";
 import { Currency } from "../../src/domain/model/money";
@@ -52,6 +56,22 @@ class FakePurchaseRepository implements PurchaseRepository {
     }
 }
 
+class FakeTransactionManager implements TransactionManager {
+    constructor(
+        private readonly creditLineRepository: CreditLineRepository,
+        private readonly purchaseRepository: PurchaseRepository
+    ) {}
+
+    async execute<T>(
+        operation: (repositories: TransactionalRepositories) => Promise<T>
+    ): Promise<T> {
+        return operation({
+            creditLineRepository: this.creditLineRepository,
+            purchaseRepository: this.purchaseRepository
+        });
+    }
+}
+
 class FakePurchaseIdGenerator implements PurchaseIdGenerator {
     nextPurchaseId(): string {
         return "purchase-1";
@@ -65,10 +85,13 @@ function buildCreatePurchaseCommandService(
     const purchaseIdGenerator: PurchaseIdGenerator = new FakePurchaseIdGenerator();
     const purchaseFinancingPlanCreator: PurchaseFinancingPlanCreator =
         new PurchaseFinancingPlanCreator();
+    const transactionManager: TransactionManager = new FakeTransactionManager(
+        creditLineRepository,
+        purchaseRepository
+    );
 
     return new CreatePurchaseCommandService(
-        creditLineRepository,
-        purchaseRepository,
+        transactionManager,
         purchaseIdGenerator,
         purchaseFinancingPlanCreator
     );

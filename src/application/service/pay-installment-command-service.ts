@@ -3,13 +3,16 @@ import type { PayInstallmentResponse } from "../dto/response/pay-installment-res
 import { CreditLineNotFoundError } from "../exception/credit-line-not-found-error";
 import { InstallmentAlreadyPaidError } from "../exception/installment-already-paid-error";
 import { InstallmentNotFoundError } from "../exception/installment-not-found-error";
+import type {
+    TransactionalRepositories,
+    TransactionManager
+} from "../transaction/transaction-manager";
 import type { CreditLine } from "../../domain/model/credit-line";
 import type { Installment } from "../../domain/model/installment";
 import { InstallmentStatus } from "../../domain/model/installment";
 import type { Purchase } from "../../domain/model/purchase";
 import { PurchaseStatus } from "../../domain/model/purchase";
 import type { CreditLineRepository } from "../../domain/repository/credit-line-repository";
-import type { PurchaseRepository } from "../../domain/repository/purchase-repository";
 import { PurchaseByIdFinder } from "./purchase-by-id-finder";
 
 type PaidInstallment = Installment & {
@@ -25,9 +28,7 @@ type PayInstallmentResult = {
 
 export class PayInstallmentCommandService {
     constructor(
-        private readonly purchaseByIdFinder: PurchaseByIdFinder,
-        private readonly purchaseRepository: PurchaseRepository,
-        private readonly creditLineRepository: CreditLineRepository
+        private readonly transactionManager: TransactionManager
     ) {}
 
     async execute(payInstallmentRequest: PayInstallmentRequest): Promise<PayInstallmentResponse> {
@@ -35,8 +36,22 @@ export class PayInstallmentCommandService {
         // se resuelve con el finder para no duplicar reglas de búsqueda.
         this.validate(payInstallmentRequest);
 
+        // El pago modifica compra y línea de crédito; ambos cambios deben confirmarse juntos.
+        return this.transactionManager.execute(
+            async (repositories: TransactionalRepositories): Promise<PayInstallmentResponse> =>
+                this.payInstallmentContract(payInstallmentRequest, repositories)
+        );
+    }
+
+    private async payInstallmentContract(
+        payInstallmentRequest: PayInstallmentRequest,
+        repositories: TransactionalRepositories
+    ): Promise<PayInstallmentResponse> {
+        const purchaseByIdFinder: PurchaseByIdFinder =
+            new PurchaseByIdFinder(repositories.purchaseRepository);
+
         // Reutilizamos el finder porque ya trae la compra completa con su plan de cuotas.
-        const purchase: Purchase = await this.purchaseByIdFinder.find(
+        const purchase: Purchase = await purchaseByIdFinder.find(
             payInstallmentRequest.purchaseId
         );
 
@@ -44,12 +59,11 @@ export class PayInstallmentCommandService {
         const payInstallmentResult: PayInstallmentResult =
             await this.payInstallment(
                 purchase,
-                payInstallmentRequest.installmentNumber
+                payInstallmentRequest.installmentNumber,
+                repositories.creditLineRepository
             );
 
-        // Hoy son dos saves en memoria; con PostgreSQL este bloque debería quedar dentro
-        // de una transacción para cubrir atomicidad, concurrencia e idempotencia.
-        await this.savePayInstallmentResult(payInstallmentResult);
+        await this.savePayInstallmentResult(payInstallmentResult, repositories);
 
         // La respuesta expone únicamente el resultado del caso de uso, no los modelos internos.
         return this.toResponse(payInstallmentResult);
@@ -66,12 +80,19 @@ export class PayInstallmentCommandService {
         }
     }
 
-    private async payInstallment(purchase: Purchase, installmentNumber: number): Promise<PayInstallmentResult> {
+    private async payInstallment(
+        purchase: Purchase,
+        installmentNumber: number,
+        creditLineRepository: CreditLineRepository
+    ): Promise<PayInstallmentResult> {
         // Solo una cuota pendiente puede producir un nuevo pago y recuperar crédito.
         const installment: Installment = this.findPayableInstallment(purchase, installmentNumber);
 
         // La compra identifica al propietario de la línea que recuperará crédito.
-        const creditLine: CreditLine = await this.findCreditLineByUserId(purchase.userId);
+        const creditLine: CreditLine = await this.findCreditLineByUserId(
+            creditLineRepository,
+            purchase.userId
+        );
         const paymentDate: Date = new Date();
         const paidInstallment: PaidInstallment = this.createPaidInstallment(installment, paymentDate);
         const updatedPurchase: Purchase = this.updatePurchase(purchase, paidInstallment, paymentDate);
@@ -106,9 +127,12 @@ export class PayInstallmentCommandService {
         return installment;
     }
 
-    private async findCreditLineByUserId(userId: string): Promise<CreditLine> {
+    private async findCreditLineByUserId(
+        creditLineRepository: CreditLineRepository,
+        userId: string
+    ): Promise<CreditLine> {
         const creditLine: CreditLine | null =
-            await this.creditLineRepository.findCreditLineByUserId(userId);
+            await creditLineRepository.findCreditLineByUserId(userId);
 
         if (creditLine === null) {
             throw new CreditLineNotFoundError(userId);
@@ -171,10 +195,13 @@ export class PayInstallmentCommandService {
         };
     }
 
-    private async savePayInstallmentResult(payInstallmentResult: PayInstallmentResult): Promise<void> {
+    private async savePayInstallmentResult(
+        payInstallmentResult: PayInstallmentResult,
+        repositories: TransactionalRepositories
+    ): Promise<void> {
         // Persistimos ambos agregados afectados por el pago: compra y línea de crédito.
-        await this.purchaseRepository.save(payInstallmentResult.purchase);
-        await this.creditLineRepository.save(payInstallmentResult.creditLine);
+        await repositories.purchaseRepository.save(payInstallmentResult.purchase);
+        await repositories.creditLineRepository.save(payInstallmentResult.creditLine);
     }
 
     private toResponse(payInstallmentResult: PayInstallmentResult): PayInstallmentResponse {

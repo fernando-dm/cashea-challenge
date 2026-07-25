@@ -18,7 +18,8 @@ En un sistema que mueve dinero, esta separación ayuda a testear la lógica crí
 
 Uso nombres como `repository` y `gateway` en lugar del término genérico `ports` porque expresan mejor la intención del contrato y hacen que el código sea más fácil de navegar para un equipo, esto es debido a que la arquitectura hexagonal tiende a crear (en algunos casos) una sobre ingenieria y por motivos practicos para este ejercicio vamos a obviar.
 
-`routes.ts` registra endpoints y delega en controllers. La creación de objetos concretos vive en `src/config/dependency-container.ts`, porque en algún punto hay que conectar Express, casos de uso e infraestructura. Tener ese punto separado deja `routes.ts` más chico y prepara el cambio de in-memory a PostgreSQL sin tocar la definición de rutas.
+`routes.ts` registra endpoints y delega en controllers, la creación de objetos concretos vive en `src/config/dependency-container.ts`, porque en algún punto hay que conectar Express, casos de uso e infraestructura. \
+Tener ese punto separado deja `routes.ts` más chico y permite elegir entre in-memory y PostgreSQL sin tocar la definición de rutas.
 
 ## Convenciones de codigo, no solo TypeScript-Bounded
 
@@ -60,19 +61,18 @@ Contiene detalles técnicos reemplazables:
 
 - conexión a PostgreSQL
 - implementación de repositorios
-- implementación simulada de gateway de medio de pago
 
 ### Presentation
 
 Contiene adapters de entrada HTTP: rutas, controladores, validaciones y traducción de errores.
 
-Los controladores no manejan errores de aplicación con `try/catch`. Si un caso de uso lanza un error, `presentation/error` lo traduce a una respuesta HTTP.
+Los controladores no manejan errores de aplicación con `try/catch`, si un caso de uso lanza un error, `presentation/error` lo traduce a una respuesta HTTP.
 
 Aunque Express registre el error handler como middleware, el proyecto lo ubica por intención y no por mecanismo: su rol estable es adaptar errores de aplicación a HTTP.
 
 La composición de dependencias vive fuera de `presentation/api/routes`. \
-Hoy el container instancia repositorios in-memory, servicios de aplicación y controllers. \
-Cuando agreguemos PostgreSQL, el cambio esperado es elegir la implementación concreta desde configuración y mantener las rutas sin cambios. \
+Hoy el container instancia repositorios, servicios de aplicación y controllers. \
+La implementación concreta de persistencia se elige desde configuración: in-memory para desarrollo/tests rápidos o PostgreSQL como base real. \
 Ojo, tambien es util para mantener responsabilidades separadas, clases chicas y dedicadas!, mas facil de leer y entender
 
 ## Repository vs Gateway
@@ -85,18 +85,21 @@ Ejemplo:
 - Consultar o guardar compras es responsabilidad de un repository. 
 - Cobrar la primera cuota con un proveedor de pagos sería responsabilidad de un gateway, basicamente una pegada a una api o servicio de terceros.
 
+Hoy no hay gateway real de pagos porque el enunciado pide modelar el flujo y estado de cuotas/crédito, si mañana se integra un PSP, el contrato debería nacer en `application/gateway` y la implementación concreta vivir en `infrastructure/gateway`.
+
 ## Consulta de línea de crédito
 ### Parte 1 Consultar la línea de crédito de un usuario (su límite y cuánto tiene disponible ahora).
 
 La consulta `GET /users/:userId/credit-line` se implementa como una query dentro de la capa de aplicación.
 
-El controller solo traduce HTTP al caso de uso. La lectura depende de `CreditLineRepository`, lo que permite empezar con una implementación in-memory y luego reemplazarla por PostgreSQL dockerizado sin cambiar presentación, aplicación ni dominio.
+El controller solo traduce HTTP al caso de uso. La lectura depende de `CreditLineRepository`, lo que permite usar in-memory o PostgreSQL dockerizado sin cambiar presentación, aplicación ni dominio.
 
 Esta decisión aplica Dependency Inversion: la lógica de aplicación depende de una abstracción y no de una base de datos concreta.
 
 Una línea de crédito con disponible `0` es un estado válido y se responde con `200 OK`; no se trata como error. Desde la perspectiva del usuario, esto significa que tiene una línea aprobada pero no tiene crédito disponible para nuevas compras.
 
-Si no existe una línea de crédito aprobada asociada al `userId`, la API responde `404 Not Found`. Esta respuesta no intenta inferir si el usuario existe o no; solo expresa que el servicio no encontró una línea de crédito consultable para ese identificador.
+Si no existe una línea de crédito aprobada asociada al `userId`, la API responde `404 Not Found`. \
+Esta respuesta no intenta inferir si el usuario existe o no; solo expresa que el servicio no encontró una línea de crédito consultable para ese identificador.
 
 Tambien esta el caso de que haya un error en la obtencion de la linea de credito (porque no?)
 
@@ -122,19 +125,21 @@ Ejemplo:
 Crédito disponible inicial: 1000.00
 Compra: 900.00 en 3 cuotas
 Cuota 1: 300.00 PAID al momento
+
 Cuotas pendientes: 300.00 + 300.00 = 600.00
 Nuevo crédito disponible: 1000.00 - 600.00 = 400.00
 ```
 
-En 1er instancia etapa se realizo con una persistencia in-memory para validar reglas de negocio y flujo HTTP.  
-Los repositories se mantienen como abstracciones para reemplazar luego por PostgreSQL sin modificar controllers ni casos de uso.
+El guardado de compra y la reserva de crédito se ejecutan dentro de `TransactionManager`. \
+Con in-memory se reutilizan los mismos repositorios para mantener el contrato simple. \
+Con PostgreSQL se abre una transacción real para persistir compra, cuotas y línea de crédito como una única unidad de trabajo.
 
 ## Consultar detalle de compra
 ### Parte 1 Consultar el detalle de una compra con su plan de cuotas.
 
 La consulta `GET /purchases/:purchaseId` se implementa como query dentro de la capa de aplicación, por lo tanto no modifica estado.
 
-El caso de uso depende de `PurchaseRepository`, esto permite consultar compras guardadas hoy en memoria y luego reemplazar esa implementación por PostgreSQL sin modificar el controller ni la lógica de aplicación.
+El caso de uso depende de `PurchaseRepository`, esto permite consultar compras guardadas en memoria o en PostgreSQL sin modificar el controller ni la lógica de aplicación.
 
 La respuesta expone el detalle de la compra y su plan de cuotas: monto total, estado de la compra, fechas de creación/modificación y cuotas con número, monto, vencimiento, estado y fecha de pago cuando aplica.
 
@@ -191,10 +196,62 @@ La respuesta del endpoint devuelve el resultado que necesita el cliente para con
 }
 ```
 
-Hoy el guardado usa dos repositories in-memory: compra y línea de crédito. \
-Con PostgreSQL este bloque debe ejecutarse dentro de una transacción. \
-Ahi tambien entra la solución real de concurrencia e idempotencia: lock o update condicional de la cuota pendiente, y una `Idempotency-Key` para repetir una request sin duplicar el pago. \
-Se arranco el proyecto con inmemory por cuestiones de simpleza y pensando incluso a largo plazo (que pasaria en test o pruebas rapidas?). 
+El guardado usa dos repositories: compra y línea de crédito. \
+El caso de uso no sabe si esos repositories son in-memory o PostgreSQL; solo exige que ambos cambios se confirmen dentro de `TransactionManager`. \
+Con PostgreSQL, `PostgresTransactionManager` ejecuta `BEGIN`, crea repositories con el mismo cliente, y luego confirma con `COMMIT` o revierte con `ROLLBACK`.
+
+Esto permite defender atomicidad: si falla guardar la compra o actualizar la línea de crédito, la operación completa se revierte. \
+La idempotencia HTTP fuerte y la concurrencia fina quedan como hardening posterior: por ejemplo, `Idempotency-Key` para reintentos seguros y update condicional/lock sobre la cuota pendiente para evitar dobles pagos simultáneos.
+
+Se mantiene in-memory y no trabajo solo con postgres, como opción por simpleza y pensando incluso a largo plazo: tests rápidos, pruebas locales y validación de reglas sin levantar servicios externos.
+
+## Persistencia y transacciones
+
+La base real elegida es PostgreSQL porque el dominio modifica dinero, crédito y cuotas, considero que la transaccionalidad es fundamental en este caso. \
+PostgreSQL da persistencia durable, transacciones ACID y herramientas claras para evolucionar luego hacia control de concurrencia más fuerte.
+
+La aplicación no depende directamente de PostgreSQL (podria ser otro motor transaccional). \
+Los casos de uso dependen de repositories y de `TransactionManager`; la infraestructura decide cómo implementar esos contratos.
+
+### In-memory
+
+La implementación in-memory queda como default para desarrollo rápido y tests. \
+No simula locks ni transacciones reales, pero respeta el mismo contrato de aplicación.
+
+### PostgreSQL
+
+La implementación PostgreSQL vive en `src/infrastructure/persistence/postgres`, siguiente en patron de arquitectura limpia. \
+Los comandos que modifican estado se ejecutan dentro de una transacción para que compra, cuotas y crédito disponible avancen juntos.
+
+Las tablas usan primary keys como constraint mínimo necesario:
+
+- `credit_lines.user_id`
+- `purchases.purchase_id`
+- `installments.purchase_id + installment_number`
+
+Por decisión de diseño, no se agregaron foreign keys ni constraints complejas en esta etapa. \
+La idea es mantener reglas de negocio explícitas en código y usar la base como persistencia consistente, no como lugar principal para expresar todo el dominio.
+
+`PostgresPurchaseRepository` no borra cuotas al guardar una compra. \
+Cada cuota conserva identidad por `purchase_id + installment_number`; cuando cambia su estado, se actualiza el registro existente. Esto evita perder historia y deja mejor preparado el modelo para auditoría.
+
+## Garantías actuales
+
+Ventajas del uso de CQRS (querys vs commands):
+- Los commands de compra y pago se ejecutan dentro de `TransactionManager`.
+- En PostgreSQL, la transacción confirma o revierte todos los cambios del caso de uso.
+- Los repositories esconden el detalle técnico de persistencia.
+- Los controllers no conocen PostgreSQL ni in-memory.
+- Los montos se modelan con `Decimal`, no con `number` nativo de JavaScript (punto importante para mencionar en la defensa, mencionar caso de Broker).
+- Las cuotas no se borran al actualizar una compra.
+
+## Mejoras futuras conscientes
+
+- Agregar `Idempotency-Key` para que reintentos HTTP no dupliquen operaciones.
+- Agregar control de concurrencia fino en PostgreSQL, por ejemplo update condicional sobre cuota `PENDING` o locks específicos.
+- Evaluar constraints adicionales si aportan seguridad sin duplicar reglas de negocio de forma confusa.
+- Integrar un gateway real de pagos si el flujo deja de ser solo modelado de estado.
+- `Mencionar casos reales, respuesta rapida y guardado del request, reintentos, arquitectura event driven.`
 
 ## Supuestos iniciales
 
@@ -205,8 +262,20 @@ Se arranco el proyecto con inmemory por cuestiones de simpleza y pensando inclus
 - La primera cuota se paga al momento de crear la compra.
 - Las cuotas futuras quedan pendientes con fecha de vencimiento.
 - Pagar una cuota pendiente restaura crédito disponible por el monto de esa cuota.
-- Las operaciones que modifican dinero o crédito deben ejecutarse dentro de una transacción cuando usemos PostgreSQL.
+- Las operaciones que modifican dinero o crédito se ejecutan dentro de una transacción cuando la persistencia elegida es PostgreSQL.
 - La API debe rechazar valores inválidos antes de ejecutar reglas de negocio.
+
+## Cobertura del enunciado
+
+- `GET /users/:userId/credit-line`: consulta límite y crédito disponible.
+- `POST /users/:userId/purchases`: crea una compra en cuotas.
+- `GET /purchases/:purchaseId`: consulta detalle de compra y plan de cuotas.
+- `POST /purchases/:purchaseId/installments/:installmentNumber/pay`: paga una cuota pendiente.
+- Cuotas permitidas: `3`, `6` y `12`.
+- Compra rechazada cuando no cabe en crédito disponible.
+- Pago de cuota recupera crédito disponible.
+- Montos expresados en moneda local (`VES`).
+- PostgreSQL disponible como persistencia real mediante Docker y configuración por environment.
 
 ---
 __La validación manual del flujo se documenta en [README.md](./README.md#pruebas-manuales-con-curl) mediante comandos `curl` y respuestas esperadas. \

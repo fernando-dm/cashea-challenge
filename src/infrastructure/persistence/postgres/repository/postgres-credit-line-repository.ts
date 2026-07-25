@@ -1,10 +1,10 @@
 import Decimal from "decimal.js";
 import type { QueryResultRow } from "pg";
-import type { CreditLine } from "../../../domain/model/credit-line";
-import type { Money } from "../../../domain/model/money";
-import { Currency } from "../../../domain/model/money";
-import type { CreditLineRepository } from "../../../domain/repository/credit-line-repository";
-import type { PostgresClient } from "./postgres-client";
+import type { CreditLine } from "../../../../domain/model/credit-line";
+import type { Money } from "../../../../domain/model/money";
+import { Currency } from "../../../../domain/model/money";
+import type { CreditLineRepository } from "../../../../domain/repository/credit-line-repository";
+import type { PostgresClient } from "../connection/postgres-client";
 
 type CreditLineRow = QueryResultRow & {
     user_id: string;
