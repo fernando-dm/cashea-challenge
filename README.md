@@ -52,7 +52,10 @@ Levantar la aplicación:
 npm run start
 ```
 
+Los ejemplos asumen la aplicación recién levantada. Hoy la persistencia default es in-memory, por eso los ids de compra empiezan en `purchase-1` y se reinician al levantar de nuevo el proceso.
+
 ### Flujo de crédito y compras
+
 Consultar crédito inicial:
 
 ```bash
@@ -90,6 +93,47 @@ Compra: 900.00 en 3 cuotas
 Cuota 1: 300.00 PAID al momento
 Cuotas pendientes: 600.00
 Nuevo crédito disponible: 1000.00 - 600.00 = 400.00
+```
+
+Consultar detalle de la primera compra:
+
+```bash
+curl -i http://localhost:3000/purchases/purchase-1
+```
+
+Respuesta esperada:
+
+```json
+{
+  "purchaseId": "purchase-1",
+  "status": "ACTIVE",
+  "installmentPlan": [
+    {
+      "installmentNumber": 1,
+      "status": "PAID",
+      "amount": {
+        "amount": "300.00",
+        "currency": "VES"
+      }
+    },
+    {
+      "installmentNumber": 2,
+      "status": "PENDING",
+      "amount": {
+        "amount": "300.00",
+        "currency": "VES"
+      }
+    },
+    {
+      "installmentNumber": 3,
+      "status": "PENDING",
+      "amount": {
+        "amount": "300.00",
+        "currency": "VES"
+      }
+    }
+  ]
+}
 ```
 
 Consultar crédito luego de la primera compra:
@@ -249,5 +293,160 @@ Respuesta esperada:
 ```json
 {
   "error": "Purchase not found"
+}
+```
+
+### Pagar cuota
+
+Pagar la cuota 2 de la primera compra:
+
+```bash
+curl -i -X POST http://localhost:3000/purchases/purchase-1/installments/2/pay
+```
+
+Respuesta esperada:
+
+```json
+{
+  "purchaseId": "purchase-1",
+  "installmentNumber": 2,
+  "status": "PAID",
+  "recoveredCredit": {
+    "amount": "300.00",
+    "currency": "VES"
+  },
+  "availableCredit": {
+    "amount": "500.00",
+    "currency": "VES"
+  },
+  "purchaseStatus": "ACTIVE"
+}
+```
+
+Consultar detalle luego del pago:
+
+```bash
+curl -i http://localhost:3000/purchases/purchase-1
+```
+
+Regla esperada:
+
+```txt
+La cuota 2 queda PAID.
+La cuota 3 sigue PENDING.
+La compra sigue ACTIVE porque todavia queda una cuota pendiente.
+```
+
+Consultar crédito luego del pago:
+
+```bash
+curl -i http://localhost:3000/users/user-with-1000-credit/credit-line
+```
+
+Respuesta esperada:
+
+```json
+{
+  "availableCredit": {
+    "amount": "500.00",
+    "currency": "VES"
+  }
+}
+```
+
+Reintentar pagar la misma cuota:
+
+```bash
+curl -i -X POST http://localhost:3000/purchases/purchase-1/installments/2/pay
+```
+
+Respuesta esperada:
+
+```json
+{
+  "error": "Installment already paid"
+}
+```
+
+Pagar una cuota inexistente:
+
+```bash
+curl -i -X POST http://localhost:3000/purchases/purchase-1/installments/99/pay
+```
+
+Respuesta esperada:
+
+```json
+{
+  "error": "Installment not found"
+}
+```
+
+Pagar una cuota de una compra inexistente:
+
+```bash
+curl -i -X POST http://localhost:3000/purchases/unknown-purchase/installments/2/pay
+```
+
+Respuesta esperada:
+
+```json
+{
+  "error": "Purchase not found"
+}
+```
+
+Pagar la cuota 3 de la primera compra:
+
+```bash
+curl -i -X POST http://localhost:3000/purchases/purchase-1/installments/3/pay
+```
+
+Respuesta esperada:
+
+```json
+{
+  "purchaseId": "purchase-1",
+  "installmentNumber": 3,
+  "status": "PAID",
+  "recoveredCredit": {
+    "amount": "300.00",
+    "currency": "VES"
+  },
+  "availableCredit": {
+    "amount": "800.00",
+    "currency": "VES"
+  },
+  "purchaseStatus": "COMPLETED"
+}
+```
+
+Consultar detalle final de la primera compra:
+
+```bash
+curl -i http://localhost:3000/purchases/purchase-1
+```
+
+Regla esperada:
+
+```txt
+Las 3 cuotas quedan PAID.
+La compra queda COMPLETED.
+```
+
+Consultar crédito final:
+
+```bash
+curl -i http://localhost:3000/users/user-with-1000-credit/credit-line
+```
+
+Respuesta esperada:
+
+```json
+{
+  "availableCredit": {
+    "amount": "800.00",
+    "currency": "VES"
+  }
 }
 ```

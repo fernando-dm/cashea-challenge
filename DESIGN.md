@@ -18,12 +18,16 @@ En un sistema que mueve dinero, esta separación ayuda a testear la lógica crí
 
 Uso nombres como `repository` y `gateway` en lugar del término genérico `ports` porque expresan mejor la intención del contrato y hacen que el código sea más fácil de navegar para un equipo, esto es debido a que la arquitectura hexagonal tiende a crear (en algunos casos) una sobre ingenieria y por motivos practicos para este ejercicio vamos a obviar.
 
+`routes.ts` registra endpoints y delega en controllers. La creación de objetos concretos vive en `src/config/dependency-container.ts`, porque en algún punto hay que conectar Express, casos de uso e infraestructura. Tener ese punto separado deja `routes.ts` más chico y prepara el cambio de in-memory a PostgreSQL sin tocar la definición de rutas.
+
 ## Convenciones de codigo, no solo TypeScript-Bounded
 
 El código prioriza tipos explícitos en variables, parámetros, retornos y propiedades. \
 **Aunque TypeScript permite inferencia**, esta convención busca que el flujo sea más fácil de leer para perfiles acostumbrados a lenguajes fuertemente tipados como Java, y reduce ambigüedad en un dominio sensible como dinero y crédito.
 
 Los controllers declaran explícitamente el contrato HTTP de cada endpoint: path params, request body, query params y response body, **esto evita depender de tipos genéricos demasiado amplios de Express** y hace que el contrato de cada endpoint sea visible en el código.
+
+Los DTOs HTTP viven en `presentation/api/dto/request` y `presentation/api/dto/response`, son tipos de Express (un tipo de acoplamiento a la tecnologia a discutir en persona), por eso no van en `application/dto`, la capa de aplicación mantiene sus propios contratos en `application/dto/request` y `application/dto/response`; de esa forma un caso de uso no queda acoplado a `Request` o `Response`.
 
 Las carpetas se nombran **por intención estable** y no por mecanismo accidental del framework. \
 Por ejemplo, el manejo de errores HTTP vive en `presentation/error` y no en `presentation/middleware`, porque su responsabilidad principal es traducir errores de aplicación a respuestas HTTP.
@@ -32,6 +36,8 @@ Los contratos de entrada y salida de la capa de aplicación se separan por inten
 No se usa `dto` como cajón genérico: 
  - si una estructura representa entrada de caso de uso va en `request`; 
  - si representa salida hacia presentation va en `response`.
+
+La capa de presentación sigue la misma idea para contratos HTTP, pero en su propia carpeta para no mezclar responsabilidades.
 
 ## Capas
 
@@ -63,6 +69,11 @@ Contiene adapters de entrada HTTP: rutas, controladores, validaciones y traducci
 Los controladores no manejan errores de aplicación con `try/catch`. Si un caso de uso lanza un error, `presentation/error` lo traduce a una respuesta HTTP.
 
 Aunque Express registre el error handler como middleware, el proyecto lo ubica por intención y no por mecanismo: su rol estable es adaptar errores de aplicación a HTTP.
+
+La composición de dependencias vive fuera de `presentation/api/routes`. \
+Hoy el container instancia repositorios in-memory, servicios de aplicación y controllers. \
+Cuando agreguemos PostgreSQL, el cambio esperado es elegir la implementación concreta desde configuración y mantener las rutas sin cambios. \
+Ojo, tambien es util para mantener responsabilidades separadas, clases chicas y dedicadas!, mas facil de leer y entender
 
 ## Repository vs Gateway
 
@@ -131,6 +142,60 @@ Una cuota pagada tiene estado `PAID` y `paidAt` informado. Una cuota pendiente t
 
 Si no existe una compra asociada al `purchaseId`, la API responde `404 Not Found` con `Purchase not found`, el `null` que puede devolver el repository se transforma inmediatamente en un error de aplicación, evitando que valores ausentes se filtren al resto del flujo.
 
+## Pagar cuota
+### Parte 4 Pagar una cuota.
+
+El endpoint elegido es `POST /purchases/:purchaseId/installments/:installmentNumber/pay`.
+
+Uso `POST` porque pagar una cuota modifica estado: cambia la cuota, cambia la compra y cambia la línea de crédito. \
+El `purchaseId` y el `installmentNumber` van en el path porque identifican la compra y la cuota sobre la que se ejecuta la acción.
+
+El caso de uso `PayInstallmentCommandService` mantiene un `execute` corto:
+
+```txt
+validate
+find purchase
+pay installment
+save result
+return response
+```
+
+La validación inicial revisa solo datos propios del comando, por ejemplo que el número de cuota sea un entero positivo. \
+La existencia de la compra se resuelve con `PurchaseByIdFinder`, porque ese servicio ya centraliza la búsqueda de compra y transforma el `null` del repository en `PurchaseNotFoundError`.
+
+Una cuota puede pagarse solo si existe y está `PENDING`. \
+Si la cuota no existe, la API responde `404 Installment not found`. \
+Si ya está pagada, responde `409 Installment already paid`.
+
+Al pagar una cuota pendiente, el sistema crea una copia de esa cuota con estado `PAID` y `paidAt`. \
+Luego reemplaza esa cuota dentro del plan de cuotas, recalcula el estado de la compra y recupera crédito disponible por el monto de la cuota pagada.
+
+La compra queda `COMPLETED` cuando no quedan cuotas `PENDING`. Si todavía existe al menos una cuota pendiente, la compra sigue `ACTIVE`.
+
+La respuesta del endpoint devuelve el resultado que necesita el cliente para confirmar el pago:
+
+```json
+{
+  "purchaseId": "purchase-1",
+  "installmentNumber": 2,
+  "status": "PAID",
+  "recoveredCredit": {
+    "amount": "300.00",
+    "currency": "VES"
+  },
+  "availableCredit": {
+    "amount": "500.00",
+    "currency": "VES"
+  },
+  "purchaseStatus": "ACTIVE"
+}
+```
+
+Hoy el guardado usa dos repositories in-memory: compra y línea de crédito. \
+Con PostgreSQL este bloque debe ejecutarse dentro de una transacción. \
+Ahi tambien entra la solución real de concurrencia e idempotencia: lock o update condicional de la cuota pendiente, y una `Idempotency-Key` para repetir una request sin duplicar el pago. \
+Se arranco el proyecto con inmemory por cuestiones de simpleza y pensando incluso a largo plazo (que pasaria en test o pruebas rapidas?). 
+
 ## Supuestos iniciales
 
 - Los montos se reciben como texto decimal con hasta dos decimales y se modelan internamente con `Decimal` para evitar errores de precisión de JavaScript.
@@ -140,7 +205,7 @@ Si no existe una compra asociada al `purchaseId`, la API responde `404 Not Found
 - La primera cuota se paga al momento de crear la compra.
 - Las cuotas futuras quedan pendientes con fecha de vencimiento.
 - Pagar una cuota pendiente restaura crédito disponible por el monto de esa cuota.
-- Las operaciones que modifican dinero o crédito deben ejecutarse dentro de una transacción.
+- Las operaciones que modifican dinero o crédito deben ejecutarse dentro de una transacción cuando usemos PostgreSQL.
 - La API debe rechazar valores inválidos antes de ejecutar reglas de negocio.
 
 ---
