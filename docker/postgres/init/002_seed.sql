@@ -1,0 +1,40 @@
+INSERT INTO credit_lines (
+    user_id,
+    credit_limit_amount,
+    credit_limit_currency,
+    available_credit_amount,
+    available_credit_currency,
+    updated_at
+) VALUES
+(
+    'user-1',
+    100000.00,
+    'VES',
+    100000.00,
+    'VES',
+    '2026-01-01T00:00:00.000Z'
+),
+(
+    'user-with-1000-credit',
+    1000.00,
+    'VES',
+    1000.00,
+    'VES',
+    '2026-01-01T00:00:00.000Z'
+),
+(
+    'user-with-limited-credit',
+    100000.00,
+    'VES',
+    100.00,
+    'VES',
+    '2026-01-01T00:00:00.000Z'
+),
+(
+    'user-without-credit',
+    100000.00,
+    'VES',
+    0.00,
+    'VES',
+    '2026-01-01T00:00:00.000Z'
+);

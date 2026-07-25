@@ -13,6 +13,8 @@ import { InMemoryPurchaseRepository } from "../infrastructure/persistence/in-mem
 import { CreditLineController } from "../presentation/api/credit-line-controller";
 import { InstallmentController } from "../presentation/api/installment-controller";
 import { PurchaseController } from "../presentation/api/purchase-controller";
+import { getPersistenceType } from "./persistence-config";
+import { PersistenceType } from "./persistence-type";
 
 export type DependencyContainer = {
     creditLineController: CreditLineController;
@@ -20,25 +22,27 @@ export type DependencyContainer = {
     installmentController: InstallmentController;
 };
 
+type Repositories = {
+    creditLineRepository: CreditLineRepository;
+    purchaseRepository: PurchaseRepository;
+};
+
 export function createDependencyContainer(): DependencyContainer {
     // Punto de composición: conectamos la aplicación con infraestructura reemplazable.
-    const creditLineRepository: CreditLineRepository =
-        new InMemoryCreditLineRepository();
-    const purchaseRepository: PurchaseRepository =
-        new InMemoryPurchaseRepository();
+    const repositories: Repositories = createRepositories();
     const purchaseIdGenerator: PurchaseIdGenerator =
         new SequentialPurchaseIdGenerator();
     const purchaseFinancingPlanCreator: PurchaseFinancingPlanCreator =
         new PurchaseFinancingPlanCreator();
     const purchaseByIdFinder: PurchaseByIdFinder =
-        new PurchaseByIdFinder(purchaseRepository);
+        new PurchaseByIdFinder(repositories.purchaseRepository);
 
     const getCreditLineByUserIdQueryService: GetCreditLineByUserIdQueryService =
-        new GetCreditLineByUserIdQueryService(creditLineRepository);
+        new GetCreditLineByUserIdQueryService(repositories.creditLineRepository);
     const createPurchaseCommandService: CreatePurchaseCommandService =
         new CreatePurchaseCommandService(
-            creditLineRepository,
-            purchaseRepository,
+            repositories.creditLineRepository,
+            repositories.purchaseRepository,
             purchaseIdGenerator,
             purchaseFinancingPlanCreator
         );
@@ -47,8 +51,8 @@ export function createDependencyContainer(): DependencyContainer {
     const payInstallmentCommandService: PayInstallmentCommandService =
         new PayInstallmentCommandService(
             purchaseByIdFinder,
-            purchaseRepository,
-            creditLineRepository
+            repositories.purchaseRepository,
+            repositories.creditLineRepository
         );
 
     return {
@@ -63,4 +67,17 @@ export function createDependencyContainer(): DependencyContainer {
             payInstallmentCommandService
         )
     };
+}
+
+function createRepositories(): Repositories {
+    const persistenceType: PersistenceType = getPersistenceType();
+
+    if (persistenceType === PersistenceType.IN_MEMORY) {
+        return {
+            creditLineRepository: new InMemoryCreditLineRepository(),
+            purchaseRepository: new InMemoryPurchaseRepository()
+        };
+    }
+
+    throw new Error("Postgres persistence is not implemented yet");
 }

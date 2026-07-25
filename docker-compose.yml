@@ -1,0 +1,21 @@
+services:
+  postgres:
+    build:
+      context: ./docker/postgres
+    container_name: cashea-challenge-postgres
+    environment:
+      POSTGRES_DB: cashea_challenge
+      POSTGRES_USER: cashea
+      POSTGRES_PASSWORD: cashea
+    ports:
+      - "5432:5432"
+    volumes:
+      - cashea_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cashea -d cashea_challenge"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  cashea_postgres_data:

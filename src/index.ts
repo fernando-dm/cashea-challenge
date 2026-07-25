@@ -1,10 +1,10 @@
+import "dotenv/config";
 import { Express } from "express";
 import { createApp } from "./app";
-
-const port: string | number = process.env.PORT ?? 3000;
+import { environment } from "./config/environment";
 
 const app: Express = createApp();
 
-app.listen(port, () => {
-    console.log(`Cashea challenge backend running on port ${port}`);
+app.listen(environment.port, () => {
+    console.log(`Cashea challenge backend running on port ${environment.port}`);
 });
