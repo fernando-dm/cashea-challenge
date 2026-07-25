@@ -3,6 +3,7 @@ import { CreatePurchaseCommandService } from "../application/service/create-purc
 import { GetCreditLineByUserIdQueryService } from "../application/service/get-credit-line-by-user-id-query-service";
 import { GetPurchaseDetailByIdQueryService } from "../application/service/get-purchase-detail-by-id-query-service";
 import { PayInstallmentCommandService } from "../application/service/pay-installment-command-service";
+import { PreviewPurchaseQueryService } from "../application/service/preview-purchase-query-service";
 import { PurchaseByIdFinder } from "../application/service/purchase-by-id-finder";
 import { PurchaseFinancingPlanCreator } from "../application/service/purchase-financing-plan-creator";
 import type { TransactionManager } from "../application/transaction/transaction-manager";
@@ -57,6 +58,11 @@ export function createDependencyContainer(): DependencyContainer {
         );
     const getPurchaseDetailByIdQueryService: GetPurchaseDetailByIdQueryService =
         new GetPurchaseDetailByIdQueryService(purchaseByIdFinder);
+    const previewPurchaseQueryService: PreviewPurchaseQueryService =
+        new PreviewPurchaseQueryService(
+            repositories.creditLineRepository,
+            purchaseFinancingPlanCreator
+        );
     const payInstallmentCommandService: PayInstallmentCommandService =
         new PayInstallmentCommandService(transactionManager);
 
@@ -66,7 +72,8 @@ export function createDependencyContainer(): DependencyContainer {
         ),
         purchaseController: new PurchaseController(
             createPurchaseCommandService,
-            getPurchaseDetailByIdQueryService
+            getPurchaseDetailByIdQueryService,
+            previewPurchaseQueryService
         ),
         installmentController: new InstallmentController(
             payInstallmentCommandService

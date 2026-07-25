@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Cashea Challenge</title>
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <main class="page">
@@ -58,13 +58,26 @@
         </section>
 
         <section class="card">
+            <h2>Consultar compra</h2>
+            <label for="purchase-id">Compra</label>
+            <div class="row">
+                <input id="purchase-id" type="text" autocomplete="off" placeholder="purchase-1">
+                <button id="load-purchase" type="button">Ver compra</button>
+            </div>
+            <p class="help-text">
+                Usá este punto para cargar una compra existente y pagar sus cuotas pendientes.
+            </p>
+        </section>
+
+        <section class="card">
             <h2>Resultado</h2>
             <div id="result" aria-live="polite">
                 <p>Sin operaciones todavía.</p>
             </div>
+            <div id="purchase-detail" class="summary hidden"></div>
         </section>
     </main>
 
-    <script src="/app.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>

@@ -1,19 +1,41 @@
 import type { CreatePurchaseRequest } from "../../application/dto/request/create-purchase-request";
+import type { PreviewPurchaseRequest } from "../../application/dto/request/preview-purchase-request";
 import type { CreatePurchaseResponse } from "../../application/dto/response/create-purchase-response";
+import type { PreviewPurchaseResponse } from "../../application/dto/response/preview-purchase-response";
 import type { PurchaseDetailResponse } from "../../application/dto/response/purchase-detail-response";
 import { CreatePurchaseCommandService } from "../../application/service/create-purchase-command-service";
 import { GetPurchaseDetailByIdQueryService } from "../../application/service/get-purchase-detail-by-id-query-service";
+import { PreviewPurchaseQueryService } from "../../application/service/preview-purchase-query-service";
 import type { CreatePurchaseRequestHttp } from "./dto/request/create-purchase-request-http";
 import type { GetPurchaseDetailRequestHttp } from "./dto/request/get-purchase-detail-request-http";
+import type { PreviewPurchaseRequestHttp } from "./dto/request/preview-purchase-request-http";
 import type { CreatePurchaseResponseHttp } from "./dto/response/create-purchase-response-http";
 import type { GetPurchaseDetailResponseHttp } from "./dto/response/get-purchase-detail-response-http";
+import type { PreviewPurchaseResponseHttp } from "./dto/response/preview-purchase-response-http";
 import { parseDecimalAmount } from "../validation/parse-decimal-amount";
 
 export class PurchaseController {
     constructor(
         private readonly createPurchaseCommandService: CreatePurchaseCommandService,
-        private readonly getPurchaseDetailByIdQueryService: GetPurchaseDetailByIdQueryService
+        private readonly getPurchaseDetailByIdQueryService: GetPurchaseDetailByIdQueryService,
+        private readonly previewPurchaseQueryService: PreviewPurchaseQueryService
     ) {}
+
+    async previewPurchase(
+        req: PreviewPurchaseRequestHttp,
+        res: PreviewPurchaseResponseHttp): Promise<PreviewPurchaseResponseHttp> {
+
+        const previewPurchaseRequest: PreviewPurchaseRequest = {
+            userId: req.params.userId,
+            amount: parseDecimalAmount(req.body.amount),
+            installments: req.body.installments
+        };
+
+        const previewPurchaseResponse: PreviewPurchaseResponse =
+            await this.previewPurchaseQueryService.execute(previewPurchaseRequest);
+
+        return res.status(200).json(previewPurchaseResponse);
+    }
 
     async createPurchase(
         req: CreatePurchaseRequestHttp,

@@ -33,6 +33,12 @@ button:disabled {
     cursor: not-allowed;
 }
 
+.small-button {
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+}
+
 input,
 select {
     width: 100%;
@@ -47,6 +53,11 @@ label {
     display: grid;
     gap: 8px;
     font-weight: 600;
+}
+
+.help-text {
+    margin-bottom: 0;
+    color: #56616f;
 }
 
 .page {
@@ -118,6 +129,10 @@ label {
     background: #f7f9fc;
 }
 
+.hidden {
+    display: none;
+}
+
 dl {
     display: grid;
     gap: 12px;
@@ -137,6 +152,27 @@ dt {
 dd {
     margin: 0;
     font-weight: 700;
+}
+
+.installments {
+    display: grid;
+    gap: 10px;
+    padding-left: 22px;
+}
+
+.installments li {
+    padding: 10px 0;
+}
+
+.installments span,
+.installments strong,
+.installments small {
+    display: inline-block;
+    margin-right: 8px;
+}
+
+.installments small {
+    color: #56616f;
 }
 
 .success {
