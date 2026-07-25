@@ -4,14 +4,14 @@ import { Currency } from "../../src/domain/model/money";
 import { InMemoryCreditLineRepository } from "../../src/infrastructure/persistence/in-memory/in-memory-credit-line-repository";
 
 describe("InMemoryCreditLineRepository", () => {
-    it("finds the credit line for an existing user", () => {
+    it("finds the credit line for an existing user", async () => {
         // given
         const creditLineRepository: InMemoryCreditLineRepository =
             new InMemoryCreditLineRepository();
 
         // when
         const creditLine: CreditLine | null =
-            creditLineRepository.findCreditLineByUserId("user-1");
+            await creditLineRepository.findCreditLineByUserId("user-1");
 
         // then
         expect(creditLine?.userId).toBe("user-1");
@@ -22,14 +22,14 @@ describe("InMemoryCreditLineRepository", () => {
         expect(creditLine?.updatedAt).toBeInstanceOf(Date);
     });
 
-    it("finds a valid credit line with zero available credit", () => {
+    it("finds a valid credit line with zero available credit", async () => {
         // given
         const creditLineRepository: InMemoryCreditLineRepository =
             new InMemoryCreditLineRepository();
 
         // when
         const creditLine: CreditLine | null =
-            creditLineRepository.findCreditLineByUserId("user-without-credit");
+            await creditLineRepository.findCreditLineByUserId("user-without-credit");
 
         // then
         expect(creditLine?.userId).toBe("user-without-credit");
@@ -40,25 +40,25 @@ describe("InMemoryCreditLineRepository", () => {
         expect(creditLine?.updatedAt).toBeInstanceOf(Date);
     });
 
-    it("returns null when no approved credit line exists for the user id", () => {
+    it("returns null when no approved credit line exists for the user id", async () => {
         // given
         const creditLineRepository: InMemoryCreditLineRepository =
             new InMemoryCreditLineRepository();
 
         // when
         const creditLine: CreditLine | null =
-            creditLineRepository.findCreditLineByUserId("unknown-user");
+            await creditLineRepository.findCreditLineByUserId("unknown-user");
 
         // then
         expect(creditLine).toBeNull();
     });
 
-    it("saves an updated credit line", () => {
+    it("saves an updated credit line", async () => {
         // given
         const creditLineRepository: InMemoryCreditLineRepository =
             new InMemoryCreditLineRepository();
         const creditLine: CreditLine | null =
-            creditLineRepository.findCreditLineByUserId("user-1");
+            await creditLineRepository.findCreditLineByUserId("user-1");
 
         if (creditLine === null) {
             throw new Error("Expected seeded credit line");
@@ -74,9 +74,9 @@ describe("InMemoryCreditLineRepository", () => {
         };
 
         // when
-        creditLineRepository.save(updatedCreditLine);
+        await creditLineRepository.save(updatedCreditLine);
         const savedCreditLine: CreditLine | null =
-            creditLineRepository.findCreditLineByUserId("user-1");
+            await creditLineRepository.findCreditLineByUserId("user-1");
 
         // then
         expect(savedCreditLine?.availableCredit.amount.toFixed(2)).toBe("99400.00");

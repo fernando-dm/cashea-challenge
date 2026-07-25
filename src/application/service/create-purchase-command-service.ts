@@ -23,14 +23,15 @@ export class CreatePurchaseCommandService {
         private readonly purchaseFinancingPlanCreator: PurchaseFinancingPlanCreator
     ) {}
 
-    execute(createPurchaseRequest: CreatePurchaseRequest): CreatePurchaseResponse {
+    async execute(createPurchaseRequest: CreatePurchaseRequest): Promise<CreatePurchaseResponse> {
         const purchaseDate: Date = new Date();
 
         // Validamos reglas mínimas propias de una compra antes de consultar datos.
         this.validate(createPurchaseRequest);
 
         // Obtenemos la línea de crédito aprobada del usuario.
-        const creditLine: CreditLine = this.findCreditLineByUserId(createPurchaseRequest.userId);
+        const creditLine: CreditLine =
+            await this.findCreditLineByUserId(createPurchaseRequest.userId);
 
         // Construimos el monto de compra con la moneda local del sistema.
         const purchaseAmount: Money = this.createPurchaseAmount(createPurchaseRequest);
@@ -57,10 +58,14 @@ export class CreatePurchaseCommandService {
             purchaseFinancingPlan.installmentPlan,
             purchaseDate
         );
-        const savedPurchase: Purchase = this.purchaseRepository.save(purchase);
+        const savedPurchase: Purchase = await this.purchaseRepository.save(purchase);
 
         // Reservamos crédito por las cuotas que quedan pendientes.
-        this.reserveCredit(creditLine, purchaseFinancingPlan.creditToReserve, purchaseDate);
+        await this.reserveCredit(
+            creditLine,
+            purchaseFinancingPlan.creditToReserve,
+            purchaseDate
+        );
 
         // Devolvemos el contrato público del endpoint.
         return this.toResponse(savedPurchase);
@@ -86,9 +91,9 @@ export class CreatePurchaseCommandService {
         }
     }
 
-    private findCreditLineByUserId(userId: string): CreditLine {
+    private async findCreditLineByUserId(userId: string): Promise<CreditLine> {
         const creditLine: CreditLine | null =
-            this.creditLineRepository.findCreditLineByUserId(userId);
+            await this.creditLineRepository.findCreditLineByUserId(userId);
 
         if (creditLine === null) {
             throw new CreditLineNotFoundError(userId);
@@ -126,11 +131,11 @@ export class CreatePurchaseCommandService {
         };
     }
 
-    private reserveCredit(
+    private async reserveCredit(
         creditLine: CreditLine,
         creditToReserve: Money,
         purchaseDate: Date
-    ): void {
+    ): Promise<void> {
         const updatedCreditLine: CreditLine = {
             ...creditLine,
             availableCredit: {
@@ -140,7 +145,7 @@ export class CreatePurchaseCommandService {
             updatedAt: purchaseDate
         };
 
-        this.creditLineRepository.save(updatedCreditLine);
+        await this.creditLineRepository.save(updatedCreditLine);
     }
 
     private toResponse(purchase: Purchase): CreatePurchaseResponse {

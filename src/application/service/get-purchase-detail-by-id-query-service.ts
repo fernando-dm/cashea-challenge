@@ -10,11 +10,11 @@ import { PurchaseByIdFinder } from "./purchase-by-id-finder";
 export class GetPurchaseDetailByIdQueryService {
     constructor(private readonly purchaseByIdFinder: PurchaseByIdFinder) {}
 
-    execute(purchaseId: string): PurchaseDetailResponse {
+    async execute(purchaseId: string): Promise<PurchaseDetailResponse> {
 
         this.validate(purchaseId);
 
-        const purchase: Purchase = this.purchaseByIdFinder.find(purchaseId);
+        const purchase: Purchase = await this.purchaseByIdFinder.find(purchaseId);
 
         return this.toResponse(purchase);
     }

@@ -10,11 +10,11 @@ import { PurchaseByIdFinder } from "../../src/application/service/purchase-by-id
 class FakePurchaseRepository implements PurchaseRepository {
     constructor(private readonly purchase: Purchase | null) {}
 
-    save(purchase: Purchase): Purchase {
+    async save(purchase: Purchase): Promise<Purchase> {
         return purchase;
     }
 
-    findPurchaseById(_purchaseId: string): Purchase | null {
+    async findPurchaseById(_purchaseId: string): Promise<Purchase | null> {
         return this.purchase;
     }
 }
@@ -38,7 +38,7 @@ function createPurchase(): Purchase {
 }
 
 describe("PurchaseByIdFinder", () => {
-    it("returns purchase when it exists", () => {
+    it("returns purchase when it exists", async () => {
         // given
         const purchaseRepository: PurchaseRepository =
             new FakePurchaseRepository(createPurchase());
@@ -46,13 +46,13 @@ describe("PurchaseByIdFinder", () => {
             new PurchaseByIdFinder(purchaseRepository);
 
         // when
-        const purchase: Purchase = purchaseByIdFinder.find("purchase-1");
+        const purchase: Purchase = await purchaseByIdFinder.find("purchase-1");
 
         // then
         expect(purchase.purchaseId).toBe("purchase-1");
     });
 
-    it("throws PurchaseNotFoundError when purchase does not exist", () => {
+    it("throws PurchaseNotFoundError when purchase does not exist", async () => {
         // given
         const purchaseRepository: PurchaseRepository =
             new FakePurchaseRepository(null);
@@ -60,12 +60,12 @@ describe("PurchaseByIdFinder", () => {
             new PurchaseByIdFinder(purchaseRepository);
 
         // when / then
-        expect((): Purchase =>
+        await expect(
             purchaseByIdFinder.find("unknown-purchase")
-        ).toThrow(PurchaseNotFoundError);
+        ).rejects.toThrow(PurchaseNotFoundError);
     });
 
-    it("throws PurchaseNotFoundError when purchase id is blank", () => {
+    it("throws PurchaseNotFoundError when purchase id is blank", async () => {
         // given
         const purchaseRepository: PurchaseRepository =
             new FakePurchaseRepository(createPurchase());
@@ -73,8 +73,8 @@ describe("PurchaseByIdFinder", () => {
             new PurchaseByIdFinder(purchaseRepository);
 
         // when / then
-        expect((): Purchase =>
+        await expect(
             purchaseByIdFinder.find(" ")
-        ).toThrow(PurchaseNotFoundError);
+        ).rejects.toThrow(PurchaseNotFoundError);
     });
 });

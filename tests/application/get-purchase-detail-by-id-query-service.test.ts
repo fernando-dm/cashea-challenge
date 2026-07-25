@@ -13,11 +13,11 @@ import { PurchaseByIdFinder } from "../../src/application/service/purchase-by-id
 class FakePurchaseRepository implements PurchaseRepository {
     constructor(private readonly purchase: Purchase | null) {}
 
-    save(purchase: Purchase): Purchase {
+    async save(purchase: Purchase): Promise<Purchase> {
         return purchase;
     }
 
-    findPurchaseById(_purchaseId: string): Purchase | null {
+    async findPurchaseById(_purchaseId: string): Promise<Purchase | null> {
         return this.purchase;
     }
 }
@@ -62,7 +62,7 @@ function createPurchase(): Purchase {
 }
 
 describe("GetPurchaseDetailByIdQueryService", () => {
-    it("returns purchase detail with installment plan", () => {
+    it("returns purchase detail with installment plan", async () => {
         // given
         const purchaseRepository: PurchaseRepository =
             new FakePurchaseRepository(createPurchase());
@@ -73,7 +73,7 @@ describe("GetPurchaseDetailByIdQueryService", () => {
 
         // when
         const purchaseDetailResponse: PurchaseDetailResponse =
-            getPurchaseDetailByIdQueryService.execute("purchase-1");
+            await getPurchaseDetailByIdQueryService.execute("purchase-1");
 
         // then
         expect(purchaseDetailResponse.purchaseId).toBe("purchase-1");
@@ -85,7 +85,7 @@ describe("GetPurchaseDetailByIdQueryService", () => {
             .toBe(InstallmentStatus.PENDING);
     });
 
-    it("throws PurchaseNotFoundError when purchase does not exist", () => {
+    it("throws PurchaseNotFoundError when purchase does not exist", async () => {
         // given
         const purchaseRepository: PurchaseRepository =
             new FakePurchaseRepository(null);
@@ -95,8 +95,8 @@ describe("GetPurchaseDetailByIdQueryService", () => {
             new GetPurchaseDetailByIdQueryService(purchaseByIdFinder);
 
         // when / then
-        expect((): PurchaseDetailResponse =>
+        await expect(
             getPurchaseDetailByIdQueryService.execute("unknown-purchase")
-        ).toThrow(PurchaseNotFoundError);
+        ).rejects.toThrow(PurchaseNotFoundError);
     });
 });

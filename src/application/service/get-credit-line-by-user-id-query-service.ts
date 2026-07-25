@@ -7,10 +7,10 @@ import type { CreditLineRepository } from "../../domain/repository/credit-line-r
 export class GetCreditLineByUserIdQueryService {
     constructor(private readonly creditLineRepository: CreditLineRepository) {}
 
-    execute(userId: string): CreditLineResponse {
+    async execute(userId: string): Promise<CreditLineResponse> {
         this.validate(userId);
 
-        const creditLine: CreditLine = this.findCreditLineByUserId(userId);
+        const creditLine: CreditLine = await this.findCreditLineByUserId(userId);
 
         return this.toResponse(creditLine);
     }
@@ -21,9 +21,9 @@ export class GetCreditLineByUserIdQueryService {
         }
     }
 
-    private findCreditLineByUserId(userId: string): CreditLine {
+    private async findCreditLineByUserId(userId: string): Promise<CreditLine> {
         const creditLine: CreditLine | null =
-            this.creditLineRepository.findCreditLineByUserId(userId);
+            await this.creditLineRepository.findCreditLineByUserId(userId);
 
         if (creditLine === null) {
             throw new CreditLineNotFoundError(userId);

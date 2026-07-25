@@ -11,17 +11,17 @@ import { GetCreditLineByUserIdQueryService } from "../../src/application/service
 class FakeCreditLineRepository implements CreditLineRepository {
     constructor(private readonly creditLine: CreditLine | null) {}
 
-    findCreditLineByUserId(_userId: string): CreditLine | null {
+    async findCreditLineByUserId(_userId: string): Promise<CreditLine | null> {
         return this.creditLine;
     }
 
-    save(creditLine: CreditLine): CreditLine {
+    async save(creditLine: CreditLine): Promise<CreditLine> {
         return creditLine;
     }
 }
 
 describe("GetCreditLineByUserIdQueryService", () => {
-    it("returns the credit line when the repository finds it", () => {
+    it("returns the credit line when the repository finds it", async () => {
         // given
         const updatedAt: Date = new Date("2026-01-01T00:00:00.000Z");
         const creditLine: CreditLine = {
@@ -43,7 +43,7 @@ describe("GetCreditLineByUserIdQueryService", () => {
 
         // when
         const creditLineResponse: CreditLineResponse =
-            getCreditLineByUserIdQueryService.execute("user-1");
+            await getCreditLineByUserIdQueryService.execute("user-1");
 
         // then
         expect(creditLineResponse).toEqual({
@@ -59,7 +59,7 @@ describe("GetCreditLineByUserIdQueryService", () => {
         });
     });
 
-    it("accepts zero available credit as a valid credit line state", () => {
+    it("accepts zero available credit as a valid credit line state", async () => {
         // given
         const updatedAt: Date = new Date("2026-01-01T00:00:00.000Z");
         const creditLine: CreditLine = {
@@ -81,13 +81,13 @@ describe("GetCreditLineByUserIdQueryService", () => {
 
         // when
         const creditLineResponse: CreditLineResponse =
-            getCreditLineByUserIdQueryService.execute("user-without-credit");
+            await getCreditLineByUserIdQueryService.execute("user-without-credit");
 
         // then
         expect(creditLineResponse.availableCredit.amount).toBe("0.00");
     });
 
-    it("throws InvalidUserIdError when user id is blank", () => {
+    it("throws InvalidUserIdError when user id is blank", async () => {
         // given
         const creditLineRepository: CreditLineRepository =
             new FakeCreditLineRepository(null);
@@ -95,12 +95,12 @@ describe("GetCreditLineByUserIdQueryService", () => {
             new GetCreditLineByUserIdQueryService(creditLineRepository);
 
         // when / then
-        expect((): CreditLineResponse =>
+        await expect(
             getCreditLineByUserIdQueryService.execute(" ")
-        ).toThrow(InvalidUserIdError);
+        ).rejects.toThrow(InvalidUserIdError);
     });
 
-    it("throws CreditLineNotFoundError when the repository does not find a credit line", () => {
+    it("throws CreditLineNotFoundError when the repository does not find a credit line", async () => {
         // given
         const creditLineRepository: CreditLineRepository =
             new FakeCreditLineRepository(null);
@@ -108,8 +108,8 @@ describe("GetCreditLineByUserIdQueryService", () => {
             new GetCreditLineByUserIdQueryService(creditLineRepository);
 
         // when / then
-        expect((): CreditLineResponse =>
+        await expect(
             getCreditLineByUserIdQueryService.execute("unknown-user")
-        ).toThrow(CreditLineNotFoundError);
+        ).rejects.toThrow(CreditLineNotFoundError);
     });
 });

@@ -23,11 +23,11 @@ class FakeCreditLineRepository implements CreditLineRepository {
         this.savedCreditLine = null;
     }
 
-    findCreditLineByUserId(_userId: string): CreditLine | null {
+    async findCreditLineByUserId(_userId: string): Promise<CreditLine | null> {
         return this.creditLine;
     }
 
-    save(creditLine: CreditLine): CreditLine {
+    async save(creditLine: CreditLine): Promise<CreditLine> {
         this.savedCreditLine = creditLine;
 
         return creditLine;
@@ -41,13 +41,13 @@ class FakePurchaseRepository implements PurchaseRepository {
         this.savedPurchase = null;
     }
 
-    save(purchase: Purchase): Purchase {
+    async save(purchase: Purchase): Promise<Purchase> {
         this.savedPurchase = purchase;
 
         return purchase;
     }
 
-    findPurchaseById(_purchaseId: string): Purchase | null {
+    async findPurchaseById(_purchaseId: string): Promise<Purchase | null> {
         return this.savedPurchase;
     }
 }
@@ -92,7 +92,7 @@ function createCreditLine(availableCreditAmount: string): CreditLine {
 }
 
 describe("CreatePurchaseCommandService", () => {
-    it("accepts an allowed installment plan", () => {
+    it("accepts an allowed installment plan", async () => {
         // given
         const creditLineRepository: CreditLineRepository =
             new FakeCreditLineRepository(createCreditLine("100000.00"));
@@ -106,14 +106,14 @@ describe("CreatePurchaseCommandService", () => {
 
         // when
         const createPurchaseResponse: CreatePurchaseResponse =
-            createPurchaseCommandService.execute(createPurchaseRequest);
+            await createPurchaseCommandService.execute(createPurchaseRequest);
 
         // then
         expect(createPurchaseResponse.installments).toBe(3);
         expect(createPurchaseResponse.amount.amount).toBe("300.50");
     });
 
-    it("throws InvalidInstallmentPlanError when installments are not allowed by the financing plan", () => {
+    it("throws InvalidInstallmentPlanError when installments are not allowed by the financing plan", async () => {
         // given
         const creditLineRepository: CreditLineRepository =
             new FakeCreditLineRepository(createCreditLine("100000.00"));
@@ -126,12 +126,12 @@ describe("CreatePurchaseCommandService", () => {
         };
 
         // when / then
-        expect((): CreatePurchaseResponse =>
+        await expect(
             createPurchaseCommandService.execute(createPurchaseRequest)
-        ).toThrow(InvalidInstallmentPlanError);
+        ).rejects.toThrow(InvalidInstallmentPlanError);
     });
 
-    it("throws InvalidPurchaseAmountError when amount is zero", () => {
+    it("throws InvalidPurchaseAmountError when amount is zero", async () => {
         // given
         const creditLineRepository: CreditLineRepository =
             new FakeCreditLineRepository(createCreditLine("100000.00"));
@@ -144,12 +144,12 @@ describe("CreatePurchaseCommandService", () => {
         };
 
         // when / then
-        expect((): CreatePurchaseResponse =>
+        await expect(
             createPurchaseCommandService.execute(createPurchaseRequest)
-        ).toThrow(InvalidPurchaseAmountError);
+        ).rejects.toThrow(InvalidPurchaseAmountError);
     });
 
-    it("throws InvalidPurchaseAmountError when amount is negative", () => {
+    it("throws InvalidPurchaseAmountError when amount is negative", async () => {
         // given
         const creditLineRepository: CreditLineRepository =
             new FakeCreditLineRepository(createCreditLine("100000.00"));
@@ -162,12 +162,12 @@ describe("CreatePurchaseCommandService", () => {
         };
 
         // when / then
-        expect((): CreatePurchaseResponse =>
+        await expect(
             createPurchaseCommandService.execute(createPurchaseRequest)
-        ).toThrow(InvalidPurchaseAmountError);
+        ).rejects.toThrow(InvalidPurchaseAmountError);
     });
 
-    it("accepts an amount with cents", () => {
+    it("accepts an amount with cents", async () => {
         // given
         const creditLineRepository: CreditLineRepository =
             new FakeCreditLineRepository(createCreditLine("100000.00"));
@@ -181,13 +181,13 @@ describe("CreatePurchaseCommandService", () => {
 
         // when
         const createPurchaseResponse: CreatePurchaseResponse =
-            createPurchaseCommandService.execute(createPurchaseRequest);
+            await createPurchaseCommandService.execute(createPurchaseRequest);
 
         // then
         expect(createPurchaseResponse.amount.amount).toBe("100.50");
     });
 
-    it("throws InsufficientCreditError when amount exceeds available credit", () => {
+    it("throws InsufficientCreditError when amount exceeds available credit", async () => {
         // given
         const creditLineRepository: CreditLineRepository =
             new FakeCreditLineRepository(createCreditLine("100.00"));
@@ -200,12 +200,12 @@ describe("CreatePurchaseCommandService", () => {
         };
 
         // when / then
-        expect((): CreatePurchaseResponse =>
+        await expect(
             createPurchaseCommandService.execute(createPurchaseRequest)
-        ).toThrow(InsufficientCreditError);
+        ).rejects.toThrow(InsufficientCreditError);
     });
 
-    it("throws CreditLineNotFoundError when the user has no approved credit line", () => {
+    it("throws CreditLineNotFoundError when the user has no approved credit line", async () => {
         // given
         const creditLineRepository: CreditLineRepository =
             new FakeCreditLineRepository(null);
@@ -218,12 +218,12 @@ describe("CreatePurchaseCommandService", () => {
         };
 
         // when / then
-        expect((): CreatePurchaseResponse =>
+        await expect(
             createPurchaseCommandService.execute(createPurchaseRequest)
-        ).toThrow(CreditLineNotFoundError);
+        ).rejects.toThrow(CreditLineNotFoundError);
     });
 
-    it("saves the purchase and reserves only pending installments credit", () => {
+    it("saves the purchase and reserves only pending installments credit", async () => {
         // given
         const creditLineRepository: FakeCreditLineRepository =
             new FakeCreditLineRepository(createCreditLine("1000.00"));
@@ -237,7 +237,7 @@ describe("CreatePurchaseCommandService", () => {
         };
 
         // when
-        createPurchaseCommandService.execute(createPurchaseRequest);
+        await createPurchaseCommandService.execute(createPurchaseRequest);
 
         // then
         expect(purchaseRepository.savedPurchase?.purchaseId).toBe("purchase-1");

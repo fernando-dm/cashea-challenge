@@ -7,7 +7,7 @@ import { PurchaseStatus } from "../../src/domain/model/purchase";
 import { InMemoryPurchaseRepository } from "../../src/infrastructure/persistence/in-memory/in-memory-purchase-repository";
 
 describe("InMemoryPurchaseRepository", () => {
-    it("saves and finds a purchase by id", () => {
+    it("saves and finds a purchase by id", async () => {
         // given
         const purchaseRepository: InMemoryPurchaseRepository =
             new InMemoryPurchaseRepository();
@@ -38,9 +38,9 @@ describe("InMemoryPurchaseRepository", () => {
         };
 
         // when
-        purchaseRepository.save(purchase);
+        await purchaseRepository.save(purchase);
         const savedPurchase: Purchase | null =
-            purchaseRepository.findPurchaseById("purchase-1");
+            await purchaseRepository.findPurchaseById("purchase-1");
 
         // then
         expect(savedPurchase?.purchaseId).toBe("purchase-1");
@@ -48,14 +48,14 @@ describe("InMemoryPurchaseRepository", () => {
         expect(savedPurchase?.updatedAt).toEqual(createdAt);
     });
 
-    it("returns null when purchase does not exist", () => {
+    it("returns null when purchase does not exist", async () => {
         // given
         const purchaseRepository: InMemoryPurchaseRepository =
             new InMemoryPurchaseRepository();
 
         // when
         const purchase: Purchase | null =
-            purchaseRepository.findPurchaseById("unknown-purchase");
+            await purchaseRepository.findPurchaseById("unknown-purchase");
 
         // then
         expect(purchase).toBeNull();

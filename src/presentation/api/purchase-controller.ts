@@ -15,9 +15,9 @@ export class PurchaseController {
         private readonly getPurchaseDetailByIdQueryService: GetPurchaseDetailByIdQueryService
     ) {}
 
-    createPurchase(
+    async createPurchase(
         req: CreatePurchaseRequestHttp,
-        res: CreatePurchaseResponseHttp): CreatePurchaseResponseHttp {
+        res: CreatePurchaseResponseHttp): Promise<CreatePurchaseResponseHttp> {
 
         const createPurchaseRequest: CreatePurchaseRequest = {
             userId: req.params.userId,
@@ -26,17 +26,17 @@ export class PurchaseController {
         };
 
         const createPurchaseResponse: CreatePurchaseResponse =
-            this.createPurchaseCommandService.execute(createPurchaseRequest);
+            await this.createPurchaseCommandService.execute(createPurchaseRequest);
 
         return res.status(201).json(createPurchaseResponse);
     }
 
-    getPurchaseDetailById(
+    async getPurchaseDetailById(
         req: GetPurchaseDetailRequestHttp,
-        res: GetPurchaseDetailResponseHttp): GetPurchaseDetailResponseHttp {
+        res: GetPurchaseDetailResponseHttp): Promise<GetPurchaseDetailResponseHttp> {
 
         const purchaseDetailResponse: PurchaseDetailResponse =
-            this.getPurchaseDetailByIdQueryService.execute(req.params.purchaseId);
+            await this.getPurchaseDetailByIdQueryService.execute(req.params.purchaseId);
 
         return res.status(200).json(purchaseDetailResponse);
     }

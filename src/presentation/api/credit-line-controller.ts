@@ -8,14 +8,14 @@ export class CreditLineController {
         private readonly getCreditLineByUserIdQueryService: GetCreditLineByUserIdQueryService
     ) {}
 
-    getCreditLineByUserId(
+    async getCreditLineByUserId(
         req: GetCreditLineRequestHttp,
         res: GetCreditLineResponseHttp
-    ): GetCreditLineResponseHttp {
+    ): Promise<GetCreditLineResponseHttp> {
         const userId: string = req.params.userId;
 
         const creditLineResponse: CreditLineResponse =
-            this.getCreditLineByUserIdQueryService.execute(userId);
+            await this.getCreditLineByUserIdQueryService.execute(userId);
 
         return res.status(200).json(creditLineResponse);
     }

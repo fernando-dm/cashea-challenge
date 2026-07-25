@@ -8,13 +8,13 @@ export class InMemoryPurchaseRepository implements PurchaseRepository {
         this.purchasesById = new Map<string, Purchase>();
     }
 
-    save(purchase: Purchase): Purchase {
+    async save(purchase: Purchase): Promise<Purchase> {
         this.purchasesById.set(purchase.purchaseId, purchase);
 
         return purchase;
     }
 
-    findPurchaseById(purchaseId: string): Purchase | null {
+    async findPurchaseById(purchaseId: string): Promise<Purchase | null> {
         const purchase: Purchase | undefined = this.purchasesById.get(purchaseId);
 
         return purchase ?? null;

@@ -10,17 +10,17 @@ export class InstallmentController {
             PayInstallmentCommandService
     ) {}
 
-    payInstallment(
+    async payInstallment(
         req: PayInstallmentRequestHttp,
         res: PayInstallmentResponseHttp
-    ): PayInstallmentResponseHttp {
+    ): Promise<PayInstallmentResponseHttp> {
         const payInstallmentRequest: PayInstallmentRequest = {
             purchaseId: req.params.purchaseId,
             installmentNumber: Number(req.params.installmentNumber)
         };
 
         const payInstallmentResponse: PayInstallmentResponse =
-            this.payInstallmentCommandService.execute(payInstallmentRequest);
+            await this.payInstallmentCommandService.execute(payInstallmentRequest);
 
         return res.status(200).json(payInstallmentResponse);
     }

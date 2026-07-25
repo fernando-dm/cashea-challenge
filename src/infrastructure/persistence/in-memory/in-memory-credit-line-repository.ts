@@ -73,14 +73,14 @@ export class InMemoryCreditLineRepository implements CreditLineRepository {
         ]);
     }
 
-    findCreditLineByUserId(userId: string): CreditLine | null {
+    async findCreditLineByUserId(userId: string): Promise<CreditLine | null> {
         const creditLine: CreditLine | undefined =
             this.creditLinesByUserId.get(userId);
 
         return creditLine ?? null;
     }
 
-    save(creditLine: CreditLine): CreditLine {
+    async save(creditLine: CreditLine): Promise<CreditLine> {
         this.creditLinesByUserId.set(creditLine.userId, creditLine);
 
         return creditLine;

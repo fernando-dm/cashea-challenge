@@ -18,25 +18,25 @@ export function createRoutes(): Router {
 
     router.get(
         "/users/:userId/credit-line",
-        (req: GetCreditLineRequestHttp, res: GetCreditLineResponseHttp) =>
+        async (req: GetCreditLineRequestHttp, res: GetCreditLineResponseHttp) =>
             dependencyContainer.creditLineController.getCreditLineByUserId(req, res)
     );
 
     router.post(
         "/users/:userId/purchases",
-        (req: CreatePurchaseRequestHttp, res: CreatePurchaseResponseHttp) =>
+        async (req: CreatePurchaseRequestHttp, res: CreatePurchaseResponseHttp) =>
             dependencyContainer.purchaseController.createPurchase(req, res)
     );
 
     router.get(
         "/purchases/:purchaseId",
-        (req: GetPurchaseDetailRequestHttp, res: GetPurchaseDetailResponseHttp) =>
+        async (req: GetPurchaseDetailRequestHttp, res: GetPurchaseDetailResponseHttp) =>
             dependencyContainer.purchaseController.getPurchaseDetailById(req, res)
     );
 
     router.post(
         "/purchases/:purchaseId/installments/:installmentNumber/pay",
-        (req: PayInstallmentRequestHttp, res: PayInstallmentResponseHttp) =>
+        async (req: PayInstallmentRequestHttp, res: PayInstallmentResponseHttp) =>
             dependencyContainer.installmentController.payInstallment(req, res)
     );
 

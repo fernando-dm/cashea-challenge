@@ -5,11 +5,11 @@ import { PurchaseNotFoundError } from "../exception/purchase-not-found-error";
 export class PurchaseByIdFinder {
     constructor(private readonly purchaseRepository: PurchaseRepository) {}
 
-    find(purchaseId: string): Purchase {
+    async find(purchaseId: string): Promise<Purchase> {
         this.validate(purchaseId);
 
         const purchase: Purchase | null =
-            this.purchaseRepository.findPurchaseById(purchaseId);
+            await this.purchaseRepository.findPurchaseById(purchaseId);
 
         if (purchase === null) {
             throw new PurchaseNotFoundError(purchaseId);
