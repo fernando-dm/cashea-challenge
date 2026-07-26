@@ -127,6 +127,8 @@ export class PostgresPurchaseRepository implements PurchaseRepository {
     private async savePurchase(purchase: Purchase): Promise<void> {
         // Usamos upsert para que guardar la misma compra dos veces sea idempotente:
         // si la compra existe, actualizamos su estado; si no existe, la insertamos.
+        // Es una simplificación para persistir el agregado tanto en creación como en actualización.
+        // No representa idempotencia HTTP y requiere un generador durable para no ocultar colisiones.
         await this.postgresClient.query(
             `INSERT INTO purchases (
                 purchase_id,

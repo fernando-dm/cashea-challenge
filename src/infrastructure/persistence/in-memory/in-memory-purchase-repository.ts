@@ -28,4 +28,16 @@ export class InMemoryPurchaseRepository implements PurchaseRepository {
                     rightPurchase.createdAt.getTime() - leftPurchase.createdAt.getTime()
             );
     }
+
+    snapshot(): Map<string, Purchase> {
+        return new Map<string, Purchase>(this.purchasesById);
+    }
+
+    restore(snapshot: Map<string, Purchase>): void {
+        this.purchasesById.clear();
+
+        for (const [purchaseId, purchase] of snapshot.entries()) {
+            this.purchasesById.set(purchaseId, purchase);
+        }
+    }
 }

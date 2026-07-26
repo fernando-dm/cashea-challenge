@@ -1,5 +1,121 @@
 # Diseño
 
+## Arquitectura hexagonal simplificada
+
+El proyecto sigue una arquitectura hexagonal simplificada. \
+
+La idea principal es que las reglas de negocio no dependan de la tecnología usada, como Express, PostgreSQL, Docker ni de cómo se expone la API.
+
+En esta arquitectura el objetivo es simplificar la solución: el centro del sistema es el dominio y los casos de uso.
+
+Un **puerto** es un contrato que la aplicación necesita para ejecutar un caso de uso, pero sin saber cómo se implementa. \
+Por ejemplo, `PurchaseRepository` dice que la aplicación puede guardar o buscar compras, pero no dice si eso ocurre en memoria, PostgreSQL o cualquier otra base.
+
+Un **adaptador** es una implementación concreta de un puerto. \
+Por ejemplo, `PostgresPurchaseRepository` implementa `PurchaseRepository` usando PostgreSQL, mientras que `InMemoryPurchaseRepository` implementa el mismo contrato usando memoria.
+
+Esto permite que los casos de uso dependan de abstracciones y no de infraestructura concreta. \
+Por eso `CreatePurchaseCommandService` y `PayInstallmentCommandService` no saben si están usando Postgres o memoria: solo reciben repositories y un `TransactionManager`.
+
+```
+src/
+│
+├── index.ts                                      Entrypoint HTTP
+├── app.ts                                        Configura Express, frontend estático, rutas y error handler
+│
+├── config/                                       COMPOSITION ROOT
+│   ├── dependency-container.ts                   Instancia servicios, controllers y adapters concretos
+│   ├── environment.ts                            Lee variables de entorno con zod
+│   └── persistence-type.ts                       Define persistencia: in-memory o postgres
+│
+├── domain/                                       CAPA DOMINIO
+│   ├── model/
+│   │   ├── money.ts                              Value object de dinero con Decimal y moneda
+│   │   ├── credit-line.ts                        Línea de crédito del usuario
+│   │   ├── purchase.ts                           Compra y estado de compra
+│   │   ├── installment.ts                        Cuota y estado de cuota
+│   │   └── purchase-financing-plan.ts            Plan financiero generado para una compra
+│   ├── repository/
+│   │   ├── credit-line-repository.ts             Puerto: persistir y consultar líneas de crédito
+│   │   └── purchase-repository.ts                Puerto: persistir y consultar compras
+│   └── exception/
+│       └── domain-error.ts                       Error base de dominio
+│
+├── application/                                  CAPA APLICACION
+│   ├── service/
+│   │   ├── get-credit-line-by-user-id-query-service.ts      Caso de uso: consultar línea
+│   │   ├── preview-purchase-query-service.ts                Caso de uso: simular compra
+│   │   ├── create-purchase-command-service.ts               Caso de uso: crear compra
+│   │   ├── get-purchase-detail-by-id-query-service.ts       Caso de uso: consultar detalle
+│   │   ├── get-purchases-by-user-id-query-service.ts        Caso de uso: listar compras del usuario
+│   │   ├── pay-installment-command-service.ts               Caso de uso: pagar cuota
+│   │   ├── purchase-by-id-finder.ts                         Servicio compartido para buscar compra
+│   │   └── purchase-financing-plan-creator.ts               Crea plan de cuotas y crédito a reservar
+│   ├── transaction/
+│   │   └── transaction-manager.ts                Puerto: ejecutar una unidad de trabajo transaccional
+│   ├── gateway/
+│   │   └── purchase-id-generator.ts              Puerto: generar identificadores de compra
+│   ├── dto/
+│   │   ├── request/                              Inputs de casos de uso
+│   │   └── response/                             Outputs de casos de uso
+│   └── exception/                                Errores de aplicación traducibles a HTTP
+│
+├── infrastructure/                               CAPA INFRAESTRUCTURA
+│   ├── gateway/
+│   │   └── sequential-purchase-id-generator.ts   Adaptador: genera IDs secuenciales para el challenge
+│   └── persistence/
+│       ├── in-memory/
+│       │   ├── in-memory-credit-line-repository.ts   Adaptador: CreditLineRepository en memoria
+│       │   ├── in-memory-purchase-repository.ts      Adaptador: PurchaseRepository en memoria
+│       │   └── in-memory-transaction-manager.ts      Adaptador: TransactionManager con snapshot/rollback
+│       └── postgres/
+│           ├── connection/
+│           │   ├── postgres-pool.ts                  Pool de conexión PostgreSQL
+│           │   └── postgres-client.ts                Tipo compartido para Pool/Client
+│           ├── repository/
+│           │   ├── postgres-credit-line-repository.ts Adaptador: CreditLineRepository en PostgreSQL
+│           │   └── postgres-purchase-repository.ts    Adaptador: PurchaseRepository en PostgreSQL
+│           └── transaction/
+│               └── postgres-transaction-manager.ts    Adaptador: TransactionManager con BEGIN/COMMIT/ROLLBACK
+│
+└── presentation/                                 CAPA PRESENTACION
+    ├── api/
+    │   ├── routes.ts                             Registro de endpoints HTTP
+    │   ├── credit-line-controller.ts             Controller REST de línea de crédito
+    │   ├── purchase-controller.ts                Controller REST de compras
+    │   ├── installment-controller.ts             Controller REST de cuotas
+    │   └── dto/
+    │       ├── request/                          Tipos HTTP de entrada
+    │       └── response/                         Tipos HTTP de salida
+    ├── validation/
+    │   └── parse-decimal-amount.ts               Validación/adaptación de monto recibido por HTTP
+    └── error/
+        └── error-handler.ts                      Traduce errores de aplicación a respuestas HTTP
+```
+
+**Puertos y adaptadores usados**:
+
+**Puertos y adaptadores usados**:
+
+| Puerto | Qué necesita la aplicación | Adaptador in-memory | Adaptador PostgreSQL |
+|---|---|---|---|
+| `CreditLineRepository` | Consultar y guardar línea de crédito | `InMemoryCreditLineRepository` | `PostgresCreditLineRepository` |
+| `PurchaseRepository` | Consultar y guardar compras con cuotas | `InMemoryPurchaseRepository` | `PostgresPurchaseRepository` |
+| `TransactionManager` | Ejecutar cambios de compra y crédito como unidad de trabajo | `InMemoryTransactionManager` | `PostgresTransactionManager` |
+| `PurchaseIdGenerator` | Generar ids de compra | `SequentialPurchaseIdGenerator` | No aplica todavía |
+
+Los `puertos` existen aunque no haya una carpeta llamada `ports`. \
+En este proyecto uso nombres más específicos para esos contratos: `repository`, `transaction` y `gateway`. \
+Los `controllers` funcionan como `adaptadores` de entrada, porque reciben HTTP y lo traducen a `casos de uso`. \
+PostgreSQL e in-memory funcionan como `adaptadores` de salida, porque implementan persistencia concreta detrás de los contratos que consume la aplicación.
+
+___
+## Documentación relacionada
+
+- [README y pruebas manuales](./README.md)
+- [Revisión de seguridad](./SECURITY_REVIEW.md)
+
+___
 ## Objetivo
 
 Construir el backend para un flujo buy-now-pay-later donde un usuario tiene una línea de crédito aprobada, puede crear compras en 3, 6 o 12 cuotas, y recupera crédito disponible a medida que paga cuotas pendientes.
@@ -278,9 +394,9 @@ Ventajas del uso de CQRS (querys vs commands):
 - PostgreSQL disponible como persistencia real mediante Docker y configuración por environment.
 
 ---
-__La validación manual del flujo se documenta en [README.md](./README.md#pruebas-manuales-con-curl) mediante comandos `curl` y respuestas esperadas. \
+__La validación manual del flujo y los paso a paso se encuentran y documenta en [README.md](./README.md#comienzo-de-las-pruebas). \
 Este documento se mantiene enfocado en las decisiones de modelado, arquitectura y reglas de negocio.__
-
+___
 ## Frontend web mínimo
 
 El frontend se implementó como HTML, CSS y `fetch`, servido estáticamente desde Express. \

@@ -1,44 +1,24 @@
 import bcrypt from "bcryptjs";
-import express, { type NextFunction, type Request, type Response } from "express";
-import jwt, { type JwtPayload, type SignOptions } from "jsonwebtoken";
-import { db } from "./db";
-
-const router = express.Router();
-const jwtSecret: string = getJwtSecret();
-const jwtExpiresIn: SignOptions["expiresIn"] = "5m";
-
-type AuthenticatedRequest = Request & {
-    userId?: string;
-};
-
-type UserRow = {
-    user_id: string;
-    email: string;
-    password_hash: string | null;
-};
-
-type CreditLineRow = {
-    credit_limit: string;
-    available_credit: string;
-};
+import express, {type Request, type Response} from "express";
+import {db} from "./db";
+import { AuthenticateMiddleware, type AuthenticatedRequest} from "./secure/authenticate";
+import { JwtTokenService} from "./secure/jwt-token-service";
+import { SecureCreditLineRepository, type SecureCreditLine} from "./secure/secure-credit-line-repository";
+import {SecureUserRepository, type SecureUser } from "./secure/secure-user-repository";
 
 type LoginRequestBody = {
     email?: unknown;
     password?: unknown;
 };
 
-// Por simplicidad tomamos el secret desde env.
-// En un sistema productivo podría venir de un servicio de autenticación,
-// un servicio de autorización, un secret manager o un sidecar.
-function getJwtSecret(): string {
-    const secret: string | undefined = process.env.JWT_SECRET;
-
-    if (!secret) {
-        throw new Error("JWT_SECRET is required to start the secure auth module");
-    }
-
-    return secret;
-}
+const router = express.Router();
+// Composition root mínimo del módulo seguro:
+// acá conectamos router, repositorios, JWT y middleware.
+// Los queries quedan en repositorios para que el controller no mezcle HTTP, SQL y reglas de seguridad.
+const userRepository: SecureUserRepository = new SecureUserRepository(db);
+const creditLineRepository: SecureCreditLineRepository = new SecureCreditLineRepository(db);
+const jwtTokenService: JwtTokenService = JwtTokenService.fromEnvironment();
+const authenticateMiddleware: AuthenticateMiddleware = new AuthenticateMiddleware(jwtTokenService, userRepository);
 
 router.post(
     "/login",
@@ -46,161 +26,74 @@ router.post(
         req: Request<object, object, LoginRequestBody>,
         res: Response
     ): Promise<Response> => {
-        const { email, password } = req.body;
+        const {email, password} = req.body;
 
         // Validamos input antes de ir a la base para evitar consultas ambiguas.
         if (typeof email !== "string" || typeof password !== "string") {
-            return res.status(400).json({ error: "Invalid login request" });
+            return res.status(400).json({error: "Invalid login request"});
         }
 
-        const user: UserRow | null = await findUserByEmail(email);
+        const user: SecureUser | null =
+            await userRepository.findUserByEmail(email);
 
         // Respondemos el mismo mensaje para usuario inexistente o password inválida.
         // Así evitamos filtrar qué emails existen en la base.
-        if (!user || !user.password_hash) {
-            return res.status(401).json({ error: "Invalid credentials" });
+        if (!user || !user.passwordHash) {
+            return res.status(401).json({error: "Invalid credentials"});
         }
 
+        // El cliente envía password al login,
+        // pero la base guarda password_hash.
+        // bcrypt compara ambos sin exponer ni pedir el hash al cliente.
         const passwordMatches: boolean = await bcrypt.compare(
             password,
-            user.password_hash
+            user.passwordHash
         );
 
         if (!passwordMatches) {
-            return res.status(401).json({ error: "Invalid credentials" });
+            return res.status(401).json({error: "Invalid credentials"});
         }
 
-        const token: string = jwt.sign(
-            { userId: user.user_id },
-            jwtSecret,
-            { expiresIn: jwtExpiresIn }
-        );
+        // Si las credenciales son válidas,
+        // emitimos un JWT firmado con secret de entorno y expiración corta.
+        const token: string = jwtTokenService.signUserToken(user.userId);
 
-        return res.json({ token });
+        return res.json({token});
     }
 );
 
-function authenticate(
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-): void {
-    const authorizationHeader: string | undefined = req.headers.authorization;
-    const token: string | null = extractBearerToken(authorizationHeader);
-
-    if (!token) {
-        res.status(401).json({ error: "Unauthorized" });
-        return;
-    }
-
-    try {
-        const decoded: string | JwtPayload = jwt.verify(token, jwtSecret);
-
-        if (typeof decoded === "string" || typeof decoded.userId !== "string") {
-            res.status(401).json({ error: "Unauthorized" });
-            return;
-        }
-
-        req.userId = decoded.userId;
-        next();
-    } catch {
-        res.status(401).json({ error: "Unauthorized" });
-    }
-}
-
 router.get(
     "/credit-line",
-    authenticate,
+    authenticateMiddleware.handle,
     async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
-
         const authenticatedUserId: string | undefined = req.userId;
-        // si manda por query param:
         const requestedUserId: unknown = req.query.userId;
 
         if (!authenticatedUserId) {
-            return res.status(401).json({ error: "Unauthorized" });
+            return res.status(401).json({error: "Unauthorized"});
         }
 
         // Defensa anti-IDOR: si el cliente manda userId, debe coincidir con el token.
         // La consulta real usa siempre el userId autenticado.
-        if (typeof requestedUserId === "string" &&
+        if (
+            typeof requestedUserId === "string" &&
             requestedUserId !== authenticatedUserId
         ) {
-            return res.status(403).json({ error: "Forbidden" });
+            return res.status(403).json({error: "Forbidden"});
         }
 
-
-        const userExists: boolean = await existsUserById(authenticatedUserId);
-
-        // Un token válido debe pertenecer a un usuario existente.
-        // Si el usuario fue borrado o nunca existió, cortamos el request.
-        if (!userExists) {
-            return res.status(401).json({ error: "Unauthorized" });
-        }
-        console.log(`creditLine for User ${authenticatedUserId} logged `);
-        const creditLine: CreditLineRow | null = await findCreditLineByUserId(authenticatedUserId);
+        const creditLine: SecureCreditLine | null =
+            await creditLineRepository.findCreditLineByUserId(authenticatedUserId);
 
         if (!creditLine) {
-            return res.status(404).json({ error: "Credit line not found" });
+            return res.status(404).json({error: "Credit line not found"});
         }
 
         return res.json({
-            credit_limit: creditLine.credit_limit,
-            available_credit: creditLine.available_credit
+            credit_limit: creditLine.creditLimit,
+            available_credit: creditLine.availableCredit
         });
     }
 );
-
-async function findUserByEmail(email: string): Promise<UserRow | null> {
-    const result = await db.query<UserRow>(
-        `SELECT user_id, email, password_hash
-         FROM users
-         WHERE email = $1`,
-        [email]
-    );
-
-    return result.rows[0] ?? null;
-}
-
-async function existsUserById(userId: string): Promise<boolean> {
-    const result = await db.query<{ exists: boolean }>(
-        `SELECT EXISTS (
-             SELECT 1
-             FROM users
-             WHERE user_id = $1
-         ) AS exists`,
-        [userId]
-    );
-
-    return result.rows[0]?.exists === true;
-}
-
-async function findCreditLineByUserId(
-    userId: string
-): Promise<CreditLineRow | null> {
-    const result = await db.query<CreditLineRow>(
-        `SELECT credit_limit_amount AS credit_limit,
-                available_credit_amount AS available_credit
-         FROM credit_lines
-         WHERE user_id = $1`,
-        [userId]
-    );
-
-    return result.rows[0] ?? null;
-}
-
-function extractBearerToken(authorizationHeader: string | undefined): string | null {
-    if (!authorizationHeader) {
-        return null;
-    }
-
-    const [scheme, token] = authorizationHeader.split(" ");
-
-    if (scheme !== "Bearer" || !token) {
-        return null;
-    }
-
-    return token;
-}
 
 export default router;

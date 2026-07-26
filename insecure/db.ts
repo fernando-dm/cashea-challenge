@@ -7,8 +7,9 @@ const pool: Pool = new Pool({
     connectionString: databaseUrl
 });
 
-// Adaptador mínimo para que el snippet inseguro pueda ejecutarse contra Postgres.
-// Lo mantenemos dentro de insecure para no mezclar este módulo heredado con la app principal.
+// Adaptador mínimo de DB para el módulo de seguridad.
+// Vive dentro de insecure porque este punto del challenge está aislado del backend principal
+// y solo necesita ejecutar queries simples contra Postgres.
 export const db = {
     query<T extends object = any>(text: string, params?: unknown[]): Promise<QueryResult<T>> {
         return pool.query<T>(text, params);

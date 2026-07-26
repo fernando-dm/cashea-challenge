@@ -85,4 +85,16 @@ export class InMemoryCreditLineRepository implements CreditLineRepository {
 
         return creditLine;
     }
+
+    snapshot(): Map<string, CreditLine> {
+        return new Map<string, CreditLine>(this.creditLinesByUserId);
+    }
+
+    restore(snapshot: Map<string, CreditLine>): void {
+        this.creditLinesByUserId.clear();
+
+        for (const [userId, creditLine] of snapshot.entries()) {
+            this.creditLinesByUserId.set(userId, creditLine);
+        }
+    }
 }

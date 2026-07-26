@@ -30,30 +30,32 @@ export type DependencyContainer = {
     installmentController: InstallmentController;
 };
 
-type Repositories = {
+type PersistenceDependencies = {
     creditLineRepository: CreditLineRepository;
     purchaseRepository: PurchaseRepository;
+    transactionManager: TransactionManager;
 };
 
 export function createDependencyContainer(): DependencyContainer {
     // Punto de composición: conectamos la aplicación con infraestructura reemplazable.
     // Todas las clases concretas se instancian acá para que controllers y casos de uso
     // dependan de contratos simples y no decidan qué implementación usar.
-    const repositories: Repositories = createRepositories();
-    const transactionManager: TransactionManager =
-        createTransactionManager(repositories);
+    const persistenceDependencies: PersistenceDependencies =
+        createPersistenceDependencies();
     const purchaseIdGenerator: PurchaseIdGenerator =
         new SequentialPurchaseIdGenerator();
     const purchaseFinancingPlanCreator: PurchaseFinancingPlanCreator =
         new PurchaseFinancingPlanCreator();
     const purchaseByIdFinder: PurchaseByIdFinder =
-        new PurchaseByIdFinder(repositories.purchaseRepository);
+        new PurchaseByIdFinder(persistenceDependencies.purchaseRepository);
 
     const getCreditLineByUserIdQueryService: GetCreditLineByUserIdQueryService =
-        new GetCreditLineByUserIdQueryService(repositories.creditLineRepository);
+        new GetCreditLineByUserIdQueryService(
+            persistenceDependencies.creditLineRepository
+        );
     const createPurchaseCommandService: CreatePurchaseCommandService =
         new CreatePurchaseCommandService(
-            transactionManager,
+            persistenceDependencies.transactionManager,
             purchaseIdGenerator,
             purchaseFinancingPlanCreator
         );
@@ -61,16 +63,18 @@ export function createDependencyContainer(): DependencyContainer {
         new GetPurchaseDetailByIdQueryService(purchaseByIdFinder);
     const getPurchasesByUserIdQueryService: GetPurchasesByUserIdQueryService =
         new GetPurchasesByUserIdQueryService(
-            repositories.creditLineRepository,
-            repositories.purchaseRepository
+            persistenceDependencies.creditLineRepository,
+            persistenceDependencies.purchaseRepository
         );
     const previewPurchaseQueryService: PreviewPurchaseQueryService =
         new PreviewPurchaseQueryService(
-            repositories.creditLineRepository,
+            persistenceDependencies.creditLineRepository,
             purchaseFinancingPlanCreator
         );
     const payInstallmentCommandService: PayInstallmentCommandService =
-        new PayInstallmentCommandService(transactionManager);
+        new PayInstallmentCommandService(
+            persistenceDependencies.transactionManager
+        );
 
     return {
         creditLineController: new CreditLineController(
@@ -88,42 +92,35 @@ export function createDependencyContainer(): DependencyContainer {
     };
 }
 
-function createRepositories(): Repositories {
+function createPersistenceDependencies(): PersistenceDependencies {
     const persistenceType: PersistenceType = environment.persistence;
 
     if (persistenceType === PersistenceType.IN_MEMORY) {
-        // Implementación default para desarrollo rápido y tests sin depender de servicios externos.
+        // In-memory comparte las mismas instancias entre queries, commands y transaction manager.
+        // Esto permite que el manager tome snapshots y restaure estado si falla una unidad de trabajo.
+        const creditLineRepository: InMemoryCreditLineRepository =
+            new InMemoryCreditLineRepository();
+        const purchaseRepository: InMemoryPurchaseRepository =
+            new InMemoryPurchaseRepository();
+
         return {
-            creditLineRepository: new InMemoryCreditLineRepository(),
-            purchaseRepository: new InMemoryPurchaseRepository()
+            creditLineRepository,
+            purchaseRepository,
+            transactionManager: new InMemoryTransactionManager(
+                creditLineRepository,
+                purchaseRepository
+            )
         };
     }
 
     if (persistenceType === PersistenceType.POSTGRES) {
-        // Implementación real seleccionada por environment, sin cambiar casos de uso ni controllers.
+        // PostgreSQL usa repositorios normales para lecturas y un transaction manager
+        // que crea repositorios con el mismo cliente dentro de BEGIN/COMMIT/ROLLBACK.
         return {
             creditLineRepository: new PostgresCreditLineRepository(postgresPool),
-            purchaseRepository: new PostgresPurchaseRepository(postgresPool)
+            purchaseRepository: new PostgresPurchaseRepository(postgresPool),
+            transactionManager: new PostgresTransactionManager(postgresPool)
         };
-    }
-
-    throw new Error(`Unsupported persistence type: ${persistenceType}`);
-}
-
-function createTransactionManager(repositories: Repositories): TransactionManager {
-    const persistenceType: PersistenceType = environment.persistence;
-
-    if (persistenceType === PersistenceType.IN_MEMORY) {
-        // In-memory usa los mismos repositorios compartidos para mantener el contrato transaccional.
-        return new InMemoryTransactionManager(
-            repositories.creditLineRepository,
-            repositories.purchaseRepository
-        );
-    }
-
-    if (persistenceType === PersistenceType.POSTGRES) {
-        // Postgres abre una transacción real y crea repositorios con el mismo cliente dentro de ella.
-        return new PostgresTransactionManager(postgresPool);
     }
 
     throw new Error(`Unsupported persistence type: ${persistenceType}`);

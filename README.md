@@ -1,5 +1,10 @@
 # Cashea Challenge
 
+## Documentación
+
+- [Diseño técnico](./DESIGN.md)
+- [Revisión de seguridad](./SECURITY_REVIEW.md)
+
 Implementación del challenge técnico full stack para Cashea.
 
 El foco principal del proyecto es el backend que maneja un flujo buy-now-pay-later: usuarios con línea de crédito
@@ -45,32 +50,6 @@ npm run dev
 La aplicación puede correr con persistencia in-memory o PostgreSQL. \
 La persistencia default es `in-memory`, pensada para desarrollo rápido y tests sin depender de servicios externos.
 
-### In-memory
-
-```bash
-npm run dev
-```
-
-### PostgreSQL
-
-Levantar la base:
-
-```bash
-docker compose up -d postgres
-```
-
-Correr la aplicación usando PostgreSQL:
-
-```bash
-PERSISTENCE=postgres npm run dev
-```
-
-La conexión default está definida en `.env.example`:
-
-```bash
-DATABASE_URL=postgres://cashea:cashea@localhost:5432/cashea_challenge
-```
-
 ## Estado del proyecto
 
 La Parte 1 del backend está implementada: consulta de línea de crédito, creación de compra en cuotas, detalle de compra y pago de cuota. \
@@ -84,17 +63,18 @@ Antes de ejecutar los curls, levantar la aplicación en uno de estos modos.
 
 Es el modo default. No requiere base de datos y reinicia los datos cada vez que se levanta el proceso.
 
+modo default:  in-memory
 ```bash
 npm run dev
 ```
 
 ### Modo PostgreSQL
 
-## Todo completo con bd postgres
+## Todo completo con bd postgres limpia solo con las migraciones
 
 ```bash
 docker compose down -v
-docker compose up -d postgres
+docker compose up -d --build postgres  
 rm -rf dist   
 npm run build
 PERSISTENCE=postgres npm run dev
@@ -138,6 +118,9 @@ Los curls de abajo se ejecutan en otra terminal.
 Los ejemplos asumen la aplicación recién levantada. \
 Con `in-memory`, los ids de compra empiezan en `purchase-1` y se reinician al levantar de nuevo el proceso. \
 Con `postgres`, los datos quedan persistidos en la base local.
+
+___
+# Comienzo de las pruebas 
 
 ### Flujo de crédito y compras
 
@@ -673,6 +656,8 @@ La cuota 2 queda PAID.
 La cuota 3 sigue PENDING.
 La compra sigue ACTIVE porque todavía queda una cuota pendiente.
 ```
+
+Salida esperada que cumple con la regla:
 ```json
 {
   "purchaseId": "purchase-1",
@@ -978,6 +963,15 @@ purchase-2 queda ACTIVE con cuota 1 PAID y cuotas 2/3 PENDING.
 ## Frontend web mínimo
 
 La aplicación también sirve una interfaz web mínima desde Express:
+
+Levanto con postgres y base limpia
+```bash
+docker compose down -v
+docker compose up -d --build postgres  
+rm -rf dist   
+npm run build
+PERSISTENCE=postgres npm run dev
+```
 
 ```txt
 http://localhost:3000/
